@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Atlas Eleitoral 2022 · RS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+<style>
+:root{
+  --black:#0C0C0C;--white:#F8F8F6;--red:#C0001A;--red-dim:rgba(192,0,26,.10);
+  --g50:#F4F4F2;--g100:#EBEBEA;--g200:#D8D8D6;--g400:#9A9A98;--g600:#585856;--g700:#383836;
+  --hh:54px;--lw:272px;--rw:356px;
+  --serif:'Playfair Display',Georgia,serif;--sans:'IBM Plex Sans','Helvetica Neue',sans-serif;
+  --r:3px;--e:.16s ease;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--sans);background:var(--white);color:var(--black);font-size:13px;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+#hdr{height:var(--hh);background:var(--black);display:flex;align-items:center;padding:0 16px;gap:12px;border-bottom:3px solid var(--red);flex-shrink:0;z-index:1000;position:relative}
+#logo{font-family:var(--serif);font-size:16px;font-weight:900;color:var(--white);white-space:nowrap;flex-shrink:0;line-height:1;letter-spacing:.3px}
+#logo em{color:var(--red);font-style:normal}
+#logo sup{font-family:var(--sans);font-size:8px;font-weight:500;color:var(--g400);letter-spacing:2px;text-transform:uppercase;margin-left:3px;vertical-align:middle}
+.hdiv{width:1px;height:20px;background:#2A2A2A;flex-shrink:0}
+#tabs{display:flex;gap:1px}
+.tab{padding:6px 14px;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--g400);background:transparent;transition:color var(--e);position:relative}
+.tab::after{content:'';position:absolute;bottom:-5px;left:14px;right:14px;height:2px;background:var(--red);transform:scaleX(0);transition:transform var(--e);border-radius:1px}
+.tab.on{color:var(--white)}.tab.on::after{transform:scaleX(1)}.tab:hover{color:#ccc}
+#filter-pill{display:none;align-items:center;gap:6px;background:#1A1A1A;border:1px solid var(--red);padding:3px 10px 3px 8px;border-radius:20px;font-size:10px;color:var(--white);font-weight:500;white-space:nowrap}
+#filter-pill.on{display:flex}
+#filter-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+#filter-x{color:var(--g400);font-size:13px;padding:0;line-height:1;margin-left:2px}
+#filter-x:hover{color:var(--white)}
+#hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+#scope{display:flex;align-items:center;gap:7px;color:var(--g400);font-size:10px;white-space:nowrap}
+#scope-badge{background:#1C1C1C;border:1px solid #2E2E2E;color:var(--white);padding:3px 10px;border-radius:20px;font-size:10px;letter-spacing:.7px;font-weight:500;transition:all var(--e)}
+#scope-badge.on{border-color:var(--red);color:var(--red)}
+.hdr-btn{padding:5px 10px;font-size:10px;font-weight:600;color:var(--g400);border:1px solid #2A2A2A;border-radius:var(--r);letter-spacing:.5px;text-transform:uppercase;transition:all var(--e)}
+.hdr-btn:hover{color:var(--white);border-color:#555}
+#app{display:flex;height:calc(100vh - var(--hh))}
+#lp{width:var(--lw);background:var(--white);border-right:1px solid var(--g200);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+#lp::-webkit-scrollbar{width:3px}
+#lp::-webkit-scrollbar-thumb{background:var(--g200)}
+.ps{padding:12px 14px 10px;border-bottom:1px solid var(--g100)}
+.slabel{font-size:8px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--g400);margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:3px}
+.chip{padding:5px 9px;font-size:11px;font-weight:500;background:var(--g100);color:var(--g600);border:1px solid var(--g200);border-radius:var(--r);transition:all var(--e);white-space:nowrap;line-height:1;cursor:pointer}
+.chip:hover{background:var(--g200);color:var(--black)}
+.chip.on{background:var(--black);color:var(--white);border-color:var(--black)}
+.chip.vista-btn{border-radius:20px}
+.chip.vista-btn.on{background:var(--red);border-color:var(--red)}
+#legend-wrap{padding:12px 14px;flex:1;min-height:0}
+.leg-title{font-size:8px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--g400);margin-bottom:8px}
+#legend-items{display:flex;flex-direction:column;gap:3px}
+.li{display:flex;align-items:center;gap:7px;cursor:pointer;border-radius:var(--r);padding:4px 5px;transition:all var(--e)}
+.li:hover{background:var(--g50)}
+.li-sw{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.li-nome{font-size:11px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-part{font-size:9px;color:var(--g400)}
+.li-r{text-align:right;flex-shrink:0}
+.li-pct{font-size:11px;font-weight:700}
+.li-abs{font-size:9px;color:var(--g400);margin-top:1px}
+#lp-foot{padding:9px 14px;border-top:1px solid var(--g100);font-size:9px;color:var(--g400);line-height:1.6}
+#map-wrap{flex:1;position:relative;overflow:hidden}
+#map{width:100%;height:100%}
+#maplabel{position:absolute;top:10px;left:10px;z-index:500;background:rgba(248,248,246,.96);border:1px solid var(--g200);border-left:3px solid var(--red);padding:7px 11px;border-radius:var(--r);pointer-events:none;backdrop-filter:blur(4px)}
+#ml-cargo{font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--g400)}
+#ml-titulo{font-family:var(--serif);font-size:13px;font-weight:700;color:var(--black);line-height:1.2;margin-top:2px}
+#loading{position:absolute;inset:0;background:rgba(248,248,246,.88);display:flex;align-items:center;justify-content:center;z-index:700;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(2px)}
+#loading.on{opacity:1;pointer-events:all}
+.spinner{width:28px;height:28px;border:2.5px solid var(--g200);border-top-color:var(--red);border-radius:50%;animation:spin .65s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#nota-escala{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);z-index:500;background:rgba(12,12,12,.82);color:var(--white);font-size:10px;padding:5px 14px;border-radius:20px;pointer-events:none;backdrop-filter:blur(4px);white-space:nowrap;display:none}
+#rp{width:var(--rw);background:var(--white);border-left:1px solid var(--g200);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+#rp::-webkit-scrollbar{width:3px}
+#rp::-webkit-scrollbar-thumb{background:var(--g200)}
+.rp-hdr{padding:12px 14px 10px;border-bottom:1px solid var(--g100);position:sticky;top:0;background:var(--white);z-index:10;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.rp-title{font-family:var(--serif);font-size:15px;font-weight:700;line-height:1.2}
+.rp-sub{font-size:10px;color:var(--g400);margin-top:2px}
+.back-btn{font-size:10px;font-weight:600;color:var(--red);padding:3px 0;white-space:nowrap;flex-shrink:0}
+.back-btn:hover{text-decoration:underline}
+.rs{padding:11px 14px;border-bottom:1px solid var(--g100)}
+.rs:last-child{border-bottom:none}
+.rs-title{font-size:8px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--g400);margin-bottom:9px}
+.rs-hint{font-size:8px;font-weight:400;letter-spacing:0;color:var(--g400)}
+.tg{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px}
+.tg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:5px}
+.titem{background:var(--g50);border:1px solid var(--g100);border-radius:var(--r);padding:7px 9px}
+.ti-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--g400);font-weight:600;margin-bottom:2px}
+.ti-val{font-family:var(--serif);font-size:14px;font-weight:700;line-height:1}
+.ti-sub{font-size:9px;color:var(--g400);margin-top:2px}
+.ccard{border:1px solid var(--g200);border-radius:var(--r);padding:8px 10px;margin-bottom:4px;display:grid;grid-template-columns:8px 1fr auto;gap:0 8px;align-items:center;position:relative;overflow:hidden;cursor:pointer;transition:background var(--e),border-color var(--e)}
+.ccard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--pc,var(--g200))}
+.ccard:hover{background:var(--g50)}
+.ccard.filtered{background:var(--red-dim);border-color:var(--red)}
+.cdot{width:7px;height:7px;border-radius:50%;background:var(--pc,var(--g400));flex-shrink:0}
+.cinfo{min-width:0}
+.cnome{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cpart{font-size:9px;color:var(--g400);margin-top:1px}
+.cvotos{text-align:right;flex-shrink:0}
+.cpct{font-family:var(--serif);font-size:15px;font-weight:700;line-height:1}
+.cabs{font-size:9px;color:var(--g400);margin-top:1px}
+.cbar-wrap{grid-column:1/-1;height:2px;background:var(--g100);border-radius:1px;margin-top:5px;overflow:hidden}
+.cbar{height:100%;border-radius:1px;background:var(--pc,var(--g400));transition:width .4s}
+.note{background:var(--g50);border:1px solid var(--g100);border-left:3px solid var(--g200);border-radius:var(--r);padding:6px 10px;font-size:10px;color:var(--g600);line-height:1.5;margin-bottom:8px}
+.empty{padding:24px 14px;text-align:center;color:var(--g400);font-size:12px}
+/* BUSCA */
+.search-wrap{padding:10px 14px;border-bottom:1px solid var(--g100);position:sticky;top:0;background:var(--white);z-index:11}
+.search-box{position:relative}
+.search-input{width:100%;padding:7px 32px 7px 10px;font-family:var(--sans);font-size:12px;border:1px solid var(--g200);border-radius:var(--r);outline:none;background:var(--g50);color:var(--black);transition:border var(--e)}
+.search-input:focus{border-color:var(--black);background:var(--white)}
+.search-input::placeholder{color:var(--g400)}
+.search-icon{position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--g400);font-size:13px;pointer-events:none}
+.sr-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--white);border:1px solid var(--g200);border-radius:var(--r);box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:100;max-height:280px;overflow-y:auto;display:none}
+.sr-item{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;transition:background var(--e)}
+.sr-item:hover{background:var(--g50)}
+.sr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sr-info{min-width:0}
+.sr-nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-sub{font-size:9px;color:var(--g400)}
+.sr-empty{padding:10px;font-size:11px;color:var(--g400);text-align:center}
+/* CARD FILTRADO */
+.fcard{background:var(--g50);border:1px solid var(--g200);border-left:3px solid var(--fc,var(--red));border-radius:var(--r);padding:10px 12px;margin-bottom:4px}
+.fcard-nm{font-weight:700;font-size:13px;line-height:1.2}
+.fcard-sub{font-size:10px;color:var(--g400);margin-top:2px}
+.fcard-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px}
+.fstat{background:var(--white);border:1px solid var(--g100);border-radius:var(--r);padding:5px 7px}
+.fstat-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.7px;color:var(--g400);font-weight:600}
+.fstat-val{font-family:var(--serif);font-size:13px;font-weight:700;line-height:1.2}
+/* TOP TERRITÓRIOS */
+.trow{display:flex;align-items:center;gap:6px;padding:4px 5px;border-radius:var(--r);cursor:pointer;transition:background var(--e)}
+.trow:hover{background:var(--g50)}
+.trow-rank{font-size:9px;color:var(--g400);width:14px;flex-shrink:0;text-align:right}
+.trow-nm{font-size:11px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow-bar-wrap{width:60px;height:4px;background:var(--g100);border-radius:2px;flex-shrink:0}
+.trow-bar{height:100%;border-radius:2px;background:var(--tc,var(--red))}
+.trow-pct{font-size:10px;font-weight:700;color:var(--black);width:36px;text-align:right;flex-shrink:0}
+.trow-abs{font-size:9px;color:var(--g400);width:42px;text-align:right;flex-shrink:0}
+.hint-box{margin:12px 0;padding:10px 12px;background:var(--g50);border:1px solid var(--g100);border-radius:var(--r);font-size:11px;color:var(--g600);line-height:1.6;text-align:center}
+#modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+#modal-overlay.on{display:flex}
+.modal{background:var(--white);border-radius:6px;width:540px;max-width:calc(100vw - 32px);max-height:80vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.25)}
+.modal-hdr{padding:20px 24px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:sticky;top:0;background:var(--white);z-index:1}
+.modal-title{font-family:var(--serif);font-size:18px;font-weight:700;line-height:1.2}
+.modal-close{color:var(--g400);font-size:20px;line-height:1;flex-shrink:0}
+.modal-close:hover{color:var(--black)}
+.modal-body{padding:20px 24px 24px}
+.modal-body h3{font-family:var(--serif);font-size:14px;font-weight:700;margin:16px 0 6px;color:var(--black)}
+.modal-body h3:first-child{margin-top:0}
+.modal-body p{font-size:12px;line-height:1.7;color:var(--g600);margin-bottom:10px}
+.modal-body ul{margin:0 0 10px 16px}
+.modal-body li{font-size:12px;line-height:1.7;color:var(--g600)}
+.tag{display:inline-block;background:var(--g100);border:1px solid var(--g200);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:var(--g600);margin:0 2px}
+@media print{
+  #hdr,#lp,#rp,#modal-overlay{display:none!important}
+  #map-wrap{width:100vw!important;height:70vh!important}
+  body{overflow:visible!important}
+  html,body{height:auto!important}
+  #app{height:auto!important;display:block!important}
+  #print-report{display:block!important}
+}
+#print-report{display:none;padding:24px;font-family:var(--sans)}
+.leaflet-container{background:#DCE4EC!important;font-family:var(--sans)!important}
+.leaflet-control-zoom{border:1px solid var(--g200)!important;border-radius:var(--r)!important;box-shadow:none!important}
+.leaflet-control-zoom a{color:var(--black)!important}
+.leaflet-tooltip{background:var(--black)!important;color:var(--white)!important;border:none!important;border-radius:var(--r)!important;padding:7px 11px!important;font-family:var(--sans)!important;font-size:11px!important;line-height:1.6!important;box-shadow:0 3px 10px rgba(0,0,0,.25)!important;pointer-events:none!important}
+.leaflet-tooltip-top::before{border-top-color:var(--black)!important}
+.leaflet-control-attribution{font-size:9px!important}
+</style>
+</head>
+<body>
+<header id="hdr">
+  <div id="logo">ATLAS<em>·</em>ELEITORAL <sup>RS 2022</sup></div>
+  <div class="hdiv"></div>
+  <div id="tabs">
+    <button class="tab on" onclick="setTab('candidatos')">Candidatos</button>
+    <button class="tab"    onclick="setTab('partidos')">Partidos</button>
+  </div>
+  <div id="filter-pill">
+    <div id="filter-dot"></div>
+    <span id="filter-label"></span>
+    <button id="filter-x" onclick="clearFilter()">✕</button>
+  </div>
+  <div id="hdr-right">
+    <div id="scope"><span>🗺</span><span id="scope-badge">RIO GRANDE DO SUL</span></div>
+    <div class="hdiv"></div>
+    <button class="hdr-btn" onclick="showModal('metodo')">Metodologia</button>
+    <button class="hdr-btn" onclick="exportPDF()">↓ PDF</button>
+  </div>
+</header>
+<div id="app">
+  <aside id="lp">
+    <div class="ps"><div class="slabel">Cargo</div><div class="chips" id="cargo-chips"></div></div>
+    <div class="ps" id="turno-ps" style="display:none"><div class="slabel">Turno</div><div class="chips" id="turno-chips"></div></div>
+    <div class="ps"><div class="slabel">Escala Territorial</div><div class="chips" id="escala-chips"></div></div>
+    <div class="ps"><div class="slabel">Visualização</div><div class="chips" id="vista-chips"></div></div>
+    <div class="ps"><div class="slabel">Grandeza — o que mapear</div><div class="chips" id="grandeza-chips"></div></div>
+    <div id="legend-wrap">
+      <div class="leg-title">Legenda — clique para filtrar</div>
+      <div id="legend-items"><div style="font-size:11px;color:var(--g400);padding:4px">Carregando...</div></div>
+    </div>
+    <div style="flex:1"></div>
+    <div id="lp-foot">Fonte: TSE · Eleições Gerais 2022<br>RS · 497 municípios · 27.429 seções</div>
+  </aside>
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div id="maplabel"><div id="ml-cargo">DEPUTADO FEDERAL</div><div id="ml-titulo">1º Turno · 2022</div></div>
+    <div id="nota-escala"></div>
+    <div id="loading"><div class="spinner"></div></div>
+  </div>
+  <aside id="rp"><div id="rp-content"><div class="empty">Carregando dados...</div></div></aside>
+</div>
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modal-title">Metodologia</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+<div id="print-report"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+const DATA='data', GEO='geo';
+const CARGOS_CFG=[
+  {slug:'dep_federal', label:'Dep. Federal',  turno:[1],   tipo:'prop'},
+  {slug:'dep_estadual',label:'Dep. Estadual', turno:[1],   tipo:'prop'},
+  {slug:'senador',     label:'Senador',       turno:[1],   tipo:'maj'},
+  {slug:'governador',  label:'Governador',    turno:[1,2], tipo:'maj'},
+];
+const ESCALAS_CFG=[
+  {id:'estado',    label:'RS',       geo:null},
+  {id:'reg_inter', label:'Região',   geo:'rs_regioes_inter.geojson'},
+  {id:'corede',    label:'COREDE',   geo:'rs_coredes.geojson'},
+  {id:'municipio', label:'Município',geo:'rs_municipios.geojson'},
+  {id:'distrito',  label:'Distrito', geo:'rs_distritos.geojson'},
+  {id:'bairro',    label:'Bairro',   geo:'rs_bairros.geojson'},
+];
+const PC={
+  PT:'#CC0000',PL:'#1E3A7B',PSDB:'#0095DA',MDB:'#D4920A',PP:'#2B5BA8',
+  PDT:'#B22222',PSOL:'#6B0DAD',REDE:'#2E8B57',NOVO:'#E8600A',
+  'UNIÃO':'#15803D',PSD:'#3B82F6',REPUBLICANOS:'#EA580C','PCdoB':'#9B1C1C',
+  SOLIDARIEDADE:'#C47E00',AVANTE:'#7C3AED',PODE:'#06B6D4',PSB:'#FF6F00',
+  CIDADANIA:'#00838F',PV:'#16A34A',AGIR:'#65A30D',PTB:'#92400E',
+  UP:'#DB2777',PSTU:'#BE123C',PATRIOTA:'#0D9488',PRD:'#0D9488',
+};
+const cor=p=>{if(!p)return'#6B7280';return PC[String(p).toUpperCase().trim()]||'#6B7280';};
+const fv=n=>n>=1e6?(n/1e6).toFixed(1).replace('.',',')+' M':n>=1e3?(n/1e3).toFixed(0)+' K':(n||0).toLocaleString('pt-BR');
+const fn=n=>(n||0).toLocaleString('pt-BR');
+const fp=n=>n!=null?(n*100).toFixed(1).replace('.',',')+'%':'—';
+const h2r=(h,a)=>{if(!h||h.length<7)return`rgba(100,100,100,${a})`;const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;};
+const normNm=s=>(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+
+// ═══════════════════════════════════════════════════════════
+// ESTADO
+// ═══════════════════════════════════════════════════════════
+const ST={
+  cargo:'dep_federal',turno:1,escala:'municipio',vista:'areas',tab:'candidatos',
+  filter:null,filterParty:null,showProp:false,metric:'winner',
+  territory:null,territoryMun:null,
+  meta:null,munData:null,secoesData:null,secoesBase:null,
+  _cache:{},_sidIdx:{},
+  _cdMunToTse:{},_tseToNm:{},
+  _lisaCache:null,_adjCache:null,_renderSeq:0,
+};
+let MAP,GLAYER=null,PLAYER=null,HLAYER=null;
+
+// ═══════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════
+async function get(url){
+  if(ST._cache[url])return ST._cache[url];
+  // Arquivos grandes → tentar versão .gz primeiro
+  const grandes=['secoes_','secoes_base'];
+  const tentarGz=url.endsWith('.json')&&grandes.some(p=>url.includes(p));
+  if(tentarGz){
+    try{
+      const r=await fetch(url+'.gz');
+      if(r.ok){
+        const buf=await r.arrayBuffer();
+        const txt=pako.ungzip(new Uint8Array(buf),{to:'string'});
+        const d=JSON.parse(txt);
+        ST._cache[url]=d;
+        return d;
+      }
+    }catch(e){/* fallback para .json abaixo */}
+  }
+  const r=await fetch(url);
+  if(!r.ok)throw new Error(`HTTP ${r.status}: ${url}`);
+  const d=await r.json();
+  ST._cache[url]=d;
+  return d;
+}
+async function loadMeta(){ST.meta=await get(`${DATA}/meta.json`);}
+async function loadSecoesBase(){
+  if(ST.secoesBase)return;
+  ST.secoesBase=await get(`${DATA}/secoes_base.json`);
+  ST._sidIdx={};
+  for(const s of ST.secoesBase)ST._sidIdx[s.sid]=s;
+}
+async function loadMunData(cargo,turno){
+  try{
+    ST.munData=await get(`${DATA}/mun_${cargo}_t${turno}.json`);
+    return ST.munData;
+  }catch(e){
+    console.warn(`Não encontrado: mun_${cargo}_t${turno}.json`);
+    if(turno===2){
+      showNota('2º turno não disponível — carregando 1º turno');
+      ST.turno=1; if(typeof buildTurnoChips==='function')buildTurnoChips();
+      try{ST.munData=await get(`${DATA}/mun_${cargo}_t1.json`);return ST.munData;}
+      catch(e2){}
+    }
+    ST.munData=null;return null;
+  }
+}
+async function loadSecoesData(cargo,turno){ST.secoesData=await get(`${DATA}/secoes_${cargo}_t${turno}.json`);return ST.secoesData;}
+async function loadGeo(scale){
+  const cfg=ESCALAS_CFG.find(e=>e.id===scale);
+  if(!cfg||!cfg.geo)return null;
+  const geo=await get(`${GEO}/${cfg.geo}`);
+  // Reconstrói meta.municipios do GeoJSON — garante COREDE/Região corretos
+  if(scale==='municipio'&&ST.meta){
+    const nmToTse={};
+    for(const [tse,info]of Object.entries(ST.meta.municipios||{})){
+      nmToTse[normNm(info.nm)]=tse;
+      ST._tseToNm[tse]=info.nm;
+    }
+    let mapeados=0;
+    for(const f of geo.features){
+      const cdMun=String(f.properties.CD_MUN);
+      const tse=f.properties.CD_MUNICIPIO
+        ? String(f.properties.CD_MUNICIPIO)
+        : nmToTse[normNm(f.properties.NM_MUN)];
+      if(tse&&cdMun){
+        ST._cdMunToTse[cdMun]=tse;
+        ST._tseToNm[tse]=f.properties.NM_MUN;
+        // Reconstruir meta com dados reais do GeoJSON
+        ST.meta.municipios[tse]={
+          nm:  f.properties.NM_MUN||''  ,
+          cor: f.properties.corede||''  ,
+          reg: f.properties.NmRgGInt||'',
+          rim: f.properties.NmRgGImd||''
+        };
+        mapeados++;
+      }
+    }
+    console.log(`GeoJSON→meta: ${mapeados} municípios | COREDEs: ${[...new Set(Object.values(ST.meta.municipios).map(m=>m.cor).filter(Boolean))].length}`);
+  }
+  return geo;
+}
+async function loadAdj(){
+  if(ST._adjCache)return ST._adjCache;
+  ST._adjCache=await get(`${DATA}/adjacencia.json`);
+  return ST._adjCache;
+}
+
+// ═══════════════════════════════════════════════════════════
+// AGREGAÇÃO
+// ═══════════════════════════════════════════════════════════
+function aggByField(munData,fieldKey){
+  const result={};
+  for(const [cdStr,mun]of Object.entries(munData.municipios)){
+    const meta=ST.meta.municipios[cdStr];
+    if(!meta)continue;
+    const key=meta[fieldKey];
+    if(!key)continue;
+    if(!result[key])result[key]={nm:key,elet:0,tot:0,bco:0,nul:0,c:{},p:{}};
+    const r=result[key];
+    r.elet+=mun.elet;r.tot+=mun.tot;r.bco+=mun.bco;r.nul+=mun.nul;
+    for(const [nr,v]of Object.entries(mun.c))r.c[nr]=(r.c[nr]||0)+v;
+    for(const [pt,v]of Object.entries(mun.p))r.p[pt]=(r.p[pt]||0)+v;
+  }
+  return result;
+}
+function aggSecoesIntraMun(cdMun,field){
+  if(!ST.secoesBase||!ST.secoesData)return{};
+  const sd=ST.secoesData;
+  const sidToIdx={};
+  for(let i=0;i<sd.sids.length;i++)sidToIdx[sd.sids[i]]=i;
+  const result={};
+  const secsMun=ST.secoesBase.filter(s=>s.cd===cdMun&&s[field]);
+  for(const sec of secsMun){
+    const k=sec[field];
+    if(!result[k])result[k]={nm:k,mun:sec.mun,elet:0,tot:0,bco:0,nul:0,c:{},p:{}};
+    const r=result[k];
+    r.elet+=sec.elet;
+    const idx=sidToIdx[sec.sid];
+    if(idx!==undefined){r.tot+=sd.tot[idx]||0;r.bco+=sd.bco[idx]||0;r.nul+=sd.nul[idx]||0;}
+  }
+  for(const [nr,entries]of Object.entries(sd.c||{})){
+    for(const [idx,v]of entries){
+      const sid=sd.sids[idx];const sec=ST._sidIdx[sid];
+      if(!sec||sec.cd!==cdMun||!sec[field])continue;
+      const k=sec[field];
+      if(result[k])result[k].c[nr]=(result[k].c[nr]||0)+v;
+    }
+  }
+  for(const [pt,entries]of Object.entries(sd.p||{})){
+    for(const [idx,v]of entries){
+      const sid=sd.sids[idx];const sec=ST._sidIdx[sid];
+      if(!sec||sec.cd!==cdMun||!sec[field])continue;
+      const k=sec[field];
+      if(result[k])result[k].p[pt]=(result[k].p[pt]||0)+v;
+    }
+  }
+  return result;
+}
+function getAgg(){
+  if(!ST.munData)return null;
+  const md=ST.munData;
+  switch(ST.escala){
+    case'estado':{
+      const e=md.estado;
+      const agg={_RS_:{nm:'Rio Grande do Sul',elet:e.elet,tot:e.tot,bco:e.bco,nul:e.nul,c:{},p:{}}};
+      for(const[,mun]of Object.entries(md.municipios)){
+        for(const[nr,v]of Object.entries(mun.c))agg._RS_.c[nr]=(agg._RS_.c[nr]||0)+v;
+        for(const[pt,v]of Object.entries(mun.p))agg._RS_.p[pt]=(agg._RS_.p[pt]||0)+v;
+      }
+      return agg;
+    }
+    case'corede':   return aggByField(md,'cor');
+    case'reg_inter':return aggByField(md,'reg');
+    case'municipio':{const agg={};for(const[cd,mun]of Object.entries(md.municipios))agg[cd]={...mun};return agg;}
+    case'distrito':case'bairro':{
+      if(!ST.territoryMun)return null;
+      return aggSecoesIntraMun(ST.territoryMun,ST.escala==='distrito'?'dist':'bairro');
+    }
+    default:return null;
+  }
+}
+// Helper robusto: tenta string e número como chave
+function getVotesFromItem(item,type,value){
+  if(!item)return 0;
+  const src=type==='cand'?(item.c||{}):(item.p||{});
+  return src[String(value)]||src[value]||0;
+}
+function getWinner(item){
+  const src=ST.tab==='candidatos'?item.c:item.p;
+  if(!src||!Object.keys(src).length)return{key:null,cor:'#ccc',pct:0,nome:'—'};
+  let maxK=null,maxV=0;
+  for(const[k,v]of Object.entries(src)){if(v>maxV){maxV=v;maxK=k;}}
+  if(!maxK)return{key:null,cor:'#ccc',pct:0,nome:'—'};
+  const nom=(ST.munData?.candidatos||[]).find(c=>String(c.nr)===String(maxK));
+  const nome=ST.tab==='candidatos'?(nom?.nm||maxK):maxK;
+  const c=ST.tab==='candidatos'?(nom?.cor||cor(nom?.pt)):cor(maxK);
+  const total=ST.tab==='candidatos'?(item.tot-item.bco-item.nul):item.tot;
+  const pct=total>0?maxV/total:0;
+  return{key:maxK,cor:c,pct,nome};
+}
+function getFilterValue(item){
+  if(!ST.filter||!item)return null;
+  const{type,value}=ST.filter;
+  const v=getVotesFromItem(item,type,value);
+  if(ST.showProp){
+    const denom=type==='cand'?(item.tot-item.bco-item.nul):item.tot;
+    return denom>0?v/denom:0;
+  }
+  return v; // totais absolutos — quantis normalizam
+}
+
+// ═══════════════════════════════════════════════════════════
+// GRANDEZAS (métricas) — comparecimento, brancos, nulos, abstenção
+// Tudo nasce da soma das seções: item.{tot,elet,bco,nul}
+// ═══════════════════════════════════════════════════════════
+const METRIC_COR={comp:'#1F7A3D',bco:'#9A9A98',nul:'#374151',abst:'#C47E00'};
+const METRIC_LBL={comp:'Comparecimento',bco:'Brancos',nul:'Nulos',abst:'Abstenção'};
+function metricValueItem(item,metric,prop){
+  const tot=item.tot||0,elet=item.elet||0,bco=item.bco||0,nul=item.nul||0;
+  switch(metric){
+    case'comp':return prop?(elet>0?tot/elet:0):tot;
+    case'bco': return prop?(tot>0?bco/tot:0):bco;
+    case'nul': return prop?(tot>0?nul/tot:0):nul;
+    case'abst':return prop?(elet>0?(elet-tot)/elet:0):Math.max(0,elet-tot);
+    default:return 0;
+  }
+}
+function metricValueSecao(tot,bco,nul,elet,metric,prop){
+  switch(metric){
+    case'comp':return prop?(elet>0?tot/elet:0):tot;
+    case'bco': return prop?(tot>0?bco/tot:0):bco;
+    case'nul': return prop?(tot>0?nul/tot:0):nul;
+    case'abst':return prop?(elet>0?(elet-tot)/elet:0):Math.max(0,elet-tot);
+    default:return 0;
+  }
+}
+// Escalar ativo unificado: filtro de candidato/partido OU métrica selecionada.
+// .active=false → modo "Vencedor" (coroplético por líder).
+function getScalar(){
+  if(ST.filter){
+    return {active:true,isFilter:true,metric:null,cor:ST.filter.cor,nome:ST.filter.nome,prop:ST.showProp,
+      valItem:item=>getFilterValue(item),
+      absItem:item=>getVotesFromItem(item,ST.filter.type,ST.filter.value)};
+  }
+  if(ST.metric&&ST.metric!=='winner'){
+    const m=ST.metric;
+    return {active:true,isFilter:false,metric:m,cor:METRIC_COR[m],nome:METRIC_LBL[m],prop:ST.showProp,
+      valItem:item=>metricValueItem(item,m,ST.showProp),
+      absItem:item=>metricValueItem(item,m,false)};
+  }
+  return {active:false};
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAPA
+// ═══════════════════════════════════════════════════════════
+function initMap(){
+  MAP=L.map('map',{center:[-29.5,-53.0],zoom:7,zoomControl:true,attributionControl:false});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:18,minZoom:5}).addTo(MAP);
+  L.control.attribution({prefix:'© OSM · CARTO · TSE'}).addTo(MAP);
+}
+function clearMapLayers(){
+  if(GLAYER){MAP.removeLayer(GLAYER);GLAYER=null;}
+  if(PLAYER){MAP.removeLayer(PLAYER);PLAYER=null;}
+  if(HLAYER){MAP.removeLayer(HLAYER);HLAYER=null;}
+  // Varredura de segurança: remove QUALQUER camada de dados remanescente
+  // (órfã de troca rápida de vista enquanto dados carregavam) — mantém só o basemap.
+  if(MAP)MAP.eachLayer(l=>{if(!(l instanceof L.TileLayer))MAP.removeLayer(l);});
+}
+function quantileBreaks(values,n=5){
+  if(!values.length)return[];
+  const s=[...values].sort((a,b)=>a-b);
+  return Array.from({length:n},(_,i)=>s[Math.floor((i+1)/n*s.length)-1]);
+}
+function quantileColor(v,breaks,baseColor,minA=0.12,maxA=0.92){
+  if(!breaks.length)return h2r(baseColor,0.4);
+  const i=breaks.findIndex(b=>v<=b);
+  const t=i<0?1:(i/(breaks.length-1));
+  return h2r(baseColor,minA+t*(maxA-minA));
+}
+
+// Obtém a chave de lookup na agg a partir das propriedades do feature
+function featureKey(props){
+  switch(ST.escala){
+    case'estado':   return'_RS_';
+    case'corede':   return props.nome;
+    case'reg_inter':return props.nome;
+    case'municipio':{
+      // Usar CD_MUNICIPIO (TSE) direto se disponível, senão lookup via CD_MUN
+      if(props.CD_MUNICIPIO)return String(props.CD_MUNICIPIO);
+      return ST._cdMunToTse[String(props.CD_MUN)]||null;
+    }
+    case'distrito': return props.NM_DIST||props.NM_MUN;
+    case'bairro':   return props.NM_BAIRRO||props.NM_MUN;
+    default:return null;
+  }
+}
+
+async function renderChoropleth(){
+  const myRender=ST._renderSeq;
+  // COREDE/Região agregam por meta.municipios — garantir que o bridge GeoJSON→meta
+  // esteja reconstruído (meta.municipios vem vazio do meta.json).
+  if(['corede','reg_inter'].includes(ST.escala)&&!Object.keys(ST.meta?.municipios||{}).length){
+    await loadGeo('municipio');
+  }
+  let geo=await loadGeo(ST.escala);
+  const agg=getAgg();
+  if(!agg)return;
+  if(ST.escala==='estado'){renderRightPanel(agg);buildLegend(agg);return;}
+  if(!geo)return;
+  // Escala intra-municipal sem dados (ex.: município sem setores de bairro)
+  if(['distrito','bairro'].includes(ST.escala)&&!Object.keys(agg).length){
+    showNota(`Sem dados de ${ST.escala==='bairro'?'bairro':'distrito'} para este município`);
+    renderRightPanel(getAgg());return;
+  }
+
+  // Para escalas intra-municipais: filtrar GeoJSON e dar zoom no município
+  let geoFiltrado = geo;
+  let boundsTarget = null;
+  if(['distrito','bairro'].includes(ST.escala) && ST.territoryMun){
+    const munNome = ST._tseToNm[String(ST.territoryMun)] || '';
+    const munNomeNorm = normNm(munNome);
+    const featsFiltrados = geo.features.filter(f => {
+      const fnm = normNm(f.properties.NM_MUN || '');
+      return fnm === munNomeNorm;
+    });
+    if(featsFiltrados.length > 0){
+      geoFiltrado = {...geo, features: featsFiltrados};
+      // Calcular bounds do município para zoom automático
+      const tmpLayer = L.geoJSON({type:'FeatureCollection',features:featsFiltrados});
+      boundsTarget = tmpLayer.getBounds();
+    }
+  }
+  geo = geoFiltrado;
+  const sc=getScalar();
+  const vals=[];
+  if(sc.active){for(const item of Object.values(agg)){const v=sc.valItem(item);if(v!=null)vals.push(v);}}
+  const breaks=sc.active?quantileBreaks(vals):[];
+  if(myRender!==ST._renderSeq)return; // vista mudou durante o carregamento → aborta
+  GLAYER=L.geoJSON(geoFiltrado||geo,{
+    style:f=>{
+      const k=featureKey(f.properties);
+      const item=k?agg[k]:null;
+      if(!item)return{fillColor:'#CCC',color:'#FFF',weight:.6,fillOpacity:.2};
+      if(sc.active){
+        const v=sc.valItem(item);
+        return{fillColor:quantileColor(v,breaks,sc.cor),color:v>0?sc.cor:'#FFF',weight:v>0?.8:.4,fillOpacity:v>0?.85:.2};
+      }
+      const w=getWinner(item);
+      const op=w.pct<.5?.45:w.pct<.6?.6:w.pct<.72?.75:.9;
+      return{fillColor:w.cor,color:'#FFF',weight:.7,fillOpacity:op};
+    },
+    onEachFeature:(f,layer)=>{
+      const k=featureKey(f.properties);
+      const item=k?agg[k]:null;
+      const nm=item?.nm||f.properties.nome||f.properties.NM_MUN||f.properties.NM_DIST||'—';
+      layer.bindTooltip(()=>{
+        if(!item)return`<strong>${nm}</strong><br><em>Sem dados</em>`;
+        const comp=item.elet>0?item.tot/item.elet:0;
+        if(sc.active){
+          const disp=sc.prop?fp(sc.valItem(item)):fv(sc.absItem(item));
+          return`<strong>${nm}</strong><br>${sc.nome}: <strong>${disp}</strong><br>Comp.: ${fp(comp)} · Eleitores: ${fn(item.elet)}`;
+        }
+        const w=getWinner(item);
+        return`<strong>${nm}</strong><br>Líder: <strong>${w.nome}</strong> · ${fp(w.pct)}<br>Comp.: ${fp(comp)} · Eleitores: ${fn(item.elet)}`;
+      },{sticky:true,direction:'top'});
+      layer.on('mouseover',e=>{if(k!==ST.territory)e.target.setStyle({weight:2,color:'#333'});});
+      layer.on('mouseout', e=>{if(k!==ST.territory)GLAYER.resetStyle(e.target);});
+      layer.on('click',()=>onFeatureClick(k,nm,f,item));
+    }
+  }).addTo(MAP);
+  renderRightPanel(agg);buildLegend(agg);
+
+  // Zoom automático para escalas intra-municipais
+  if(typeof boundsTarget!=='undefined'&&boundsTarget){
+    MAP.fitBounds(boundsTarget,{padding:[30,30],maxZoom:13});
+  }
+}
+
+function onFeatureClick(key,nome,feature,item){
+  if(ST.escala==='municipio'){
+    // Guardar código TSE (usado para cruzar com secoesBase que usa CD_MUNICIPIO TSE)
+    const cdMunIbge=String(feature.properties.CD_MUN);
+    const tse=ST._cdMunToTse[cdMunIbge];
+    ST.territoryMun=tse?Number(tse):Number(cdMunIbge);
+  }
+  ST.territory=key;
+  // Zoom para o território clicado
+  if(GLAYER){
+    GLAYER.eachLayer(l=>{
+      if(!l.feature)return;
+      const k=featureKey(l.feature.properties);
+      if(k===key){
+        l.setStyle({weight:2.5,color:'#0C0C0C'});
+        l.bringToFront();
+        try{MAP.fitBounds(l.getBounds(),{padding:[30,30],maxZoom:ST.escala==='municipio'?12:9});}catch(e){}
+      }else if(!ST.filter)GLAYER.resetStyle(l);
+    });
+  }
+  updateScopeBadge(nome);
+  if(item)renderRightPanelItem(item,nome,key!=='_RS_');
+  // Sugerir drill-down para município
+  // secoesBase.cd é código TSE (int) — comparar com ST.territoryMun (TSE), nunca com CD_MUN (IBGE)
+  if(ST.escala==='municipio'){
+    const tseSel=ST.territoryMun;
+    const hasBairro=ST.secoesBase?.some(s=>s.cd===tseSel&&s.bairro);
+    if(hasBairro)showNota('Selecione "Bairro" para ver detalhes internos');
+    else showNota('Selecione "Distrito" para ver detalhes internos');
+  }
+}
+
+// Subconjunto de seções conforme escala/abrangência (e território selecionado)
+function subsetSecoes(sb){
+  if(['distrito','bairro'].includes(ST.escala)&&ST.territoryMun)return sb.filter(s=>s.cd===ST.territoryMun);
+  if(ST.escala==='reg_inter'&&ST.territory)return sb.filter(s=>normNm(s.reg)===normNm(ST.territory));
+  if(ST.escala==='corede'&&ST.territory)return sb.filter(s=>normNm(s.cor)===normNm(ST.territory));
+  return sb;
+}
+function zoomSecoes(subset){
+  if(subset.length&&subset.length<ST.secoesBase.length){
+    const lats=subset.map(s=>s.lat),lons=subset.map(s=>s.lon);
+    MAP.fitBounds([[Math.min(...lats)-0.02,Math.min(...lons)-0.02],[Math.max(...lats)+0.02,Math.max(...lons)+0.02]],{padding:[30,30],maxZoom:13});
+  }
+}
+// Valor de uma seção conforme a grandeza ativa (candidato/partido OU métrica OU total)
+function secVal(sd,idx,sec){
+  if(idx===undefined)return 0;
+  if(ST.filter){
+    let vv=0;
+    if(ST.filter.type==='cand'){for(const[i2,v]of(sd.c[String(ST.filter.value)]||[]))if(i2===idx){vv=v;break;}}
+    else{for(const[i2,v]of(sd.p[ST.filter.value]||[]))if(i2===idx){vv=v;break;}}
+    if(ST.showProp){ // % do candidato/partido na seção (mesmo denominador das Áreas)
+      const tot=sd.tot[idx]||0,bco=sd.bco[idx]||0,nul=sd.nul[idx]||0;
+      const denom=ST.filter.type==='cand'?(tot-bco-nul):tot;
+      return denom>0?vv/denom:0;
+    }
+    return vv;
+  }
+  if(ST.metric&&ST.metric!=='winner')return metricValueSecao(sd.tot[idx]||0,sd.bco[idx]||0,sd.nul[idx]||0,sec.elet||0,ST.metric,ST.showProp);
+  return sd.tot[idx]||0;
+}
+// Garante base + dados por seção do cargo (Governador não tem → null → fallback Áreas)
+async function ensureSecoes(){
+  if(!ST.secoesBase)await loadSecoesBase();
+  if(!ST.secoesData){try{await loadSecoesData(ST.cargo,ST.turno);}catch(e){ST.secoesData=null;}}
+  return ST.secoesData&&ST.secoesBase;
+}
+
+async function renderPontos(){
+  const myRender=ST._renderSeq;
+  const ok=await ensureSecoes();
+  if(!ok){showNota('Pontos/Calor sem dados por seção para este cargo — mostrando Áreas');ST.vista='areas';buildVistaChips();await renderChoropleth();return;}
+  const sd=ST.secoesData,sb=ST.secoesBase;
+  // candidato/partido fora dos dados de seção (top-100) → Áreas
+  if(ST.filter&&ST.filter.type==='cand'&&!(sd.c&&sd.c[String(ST.filter.value)])){showNota(`"${ST.filter.nome}" não disponível em pontos — mostrando Áreas`);ST.vista='areas';buildVistaChips();await renderChoropleth();return;}
+  if(ST.filter&&ST.filter.type==='partido'&&!(sd.p&&sd.p[ST.filter.value])){showNota(`"${ST.filter.nome}" não disponível em pontos — mostrando Áreas`);ST.vista='areas';buildVistaChips();await renderChoropleth();return;}
+  const subset=subsetSecoes(sb);
+  zoomSecoes(subset);
+  const sidToIdx={};for(let i=0;i<sd.sids.length;i++)sidToIdx[sd.sids[i]]=i;
+  const sc=getScalar();
+  const vals=subset.map(sec=>secVal(sd,sidToIdx[sec.sid],sec));
+  const nz=vals.filter(v=>v>0).sort((a,b)=>a-b);
+  const q=[nz[Math.floor(nz.length*.25)]||1,nz[Math.floor(nz.length*.50)]||2,nz[Math.floor(nz.length*.75)]||3];
+  const getR=v=>v<q[0]?3:v<q[1]?5:v<q[2]?8:12;
+  const col=sc.active?sc.cor:'#C0001A';
+  const canvasR=L.canvas({padding:.5}); // canvas aguenta ~27 mil seções (escala Estado)
+  const markers=[];
+  for(let i=0;i<subset.length;i++){
+    const sec=subset[i],v=vals[i];
+    if(v<=0&&sc.active)continue;
+    const valTxt=(sc.active&&sc.prop)?fp(v):fn(v); // v já é fração quando proporcional
+    const circle=L.circleMarker([sec.lat,sec.lon],{renderer:canvasR,radius:getR(v),color:col,fillColor:col,weight:.5,fillOpacity:v>0?.75:.2,opacity:v>0?.75:.2});
+    circle.bindTooltip(`<strong>${sec.mun}</strong><br>Zona ${sec.sid.split('_')[1]} · Seção ${sec.sid.split('_')[2]}<br>${sc.active?sc.nome+': '+valTxt+'<br>':''}Eleitores: ${fn(sec.elet)}`,{sticky:true,direction:'top'});
+    markers.push(circle);
+  }
+  if(myRender!==ST._renderSeq)return; // vista mudou durante o carregamento → aborta
+  PLAYER=L.layerGroup(markers).addTo(MAP);
+}
+
+async function renderCalor(){
+  const myRender=ST._renderSeq;
+  const ok=await ensureSecoes();
+  if(!ok){showNota('Pontos/Calor sem dados por seção para este cargo — mostrando Áreas');ST.vista='areas';buildVistaChips();await renderChoropleth();return;}
+  const sd=ST.secoesData,sb=ST.secoesBase;
+  const subset=subsetSecoes(sb);
+  zoomSecoes(subset);
+  const sidToIdx={};for(let i=0;i<sd.sids.length;i++)sidToIdx[sd.sids[i]]=i;
+  const heatData=[];
+  for(const sec of subset){const v=secVal(sd,sidToIdx[sec.sid],sec);if(v>0)heatData.push([sec.lat,sec.lon,v]);}
+  if(myRender!==ST._renderSeq)return; // vista mudou durante o carregamento → aborta
+  if(typeof L.heatLayer!=='undefined'){
+    const maxV=Math.max(...heatData.map(d=>d[2]),1);
+    HLAYER=L.heatLayer(heatData.map(d=>[d[0],d[1],d[2]/maxV]),{radius:18,blur:22,maxZoom:12,gradient:{0:'#0000FF',0.4:'#00FFFF',0.6:'#00FF00',0.8:'#FFFF00',1:'#FF0000'}}).addTo(MAP);
+  }else{await renderPontos();}
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLUSTERS LISA
+// ═══════════════════════════════════════════════════════════
+const LISA_CORES={HH:'#b2182b',LL:'#2166ac',HL:'#ef8a62',LH:'#67a9cf',ns:'#cccccc'};
+const LISA_LABELS={HH:'Alto-Alto',LL:'Baixo-Baixo',HL:'Alto-Baixo',LH:'Baixo-Alto',ns:'Não significativo'};
+
+function shuffleCopy(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function computeLISA(ids,valMap,adjMap,nperm=499,alpha=0.05){
+  const vals=ids.map(id=>valMap[id]??0);
+  const n=vals.length;
+  const mean=vals.reduce((a,b)=>a+b,0)/n;
+  const cen=vals.map(v=>v-mean);
+  const vari=cen.reduce((s,v)=>s+v*v,0)/n||1;
+  const id2i=Object.fromEntries(ids.map((id,i)=>[String(id),i]));
+  const results={};
+  for(let i=0;i<n;i++){
+    const id=ids[i];
+    const nbr=(adjMap[String(id)]||[]).map(nid=>id2i[String(nid)]).filter(j=>j!==undefined&&j!==i);
+    const k=nbr.length;
+    if(!k){results[id]={I:0,p:1,cluster:'ns'};continue;}
+    const wlag=nbr.reduce((s,j)=>s+cen[j],0)/k;
+    const Ii=cen[i]*wlag/vari, absIi=Math.abs(Ii);
+    // Amostragem parcial Fisher-Yates: sorteia só k vizinhos por permutação
+    // (O(k) em vez de O(n) por permutação — mesma estatística, ~150x mais rápido)
+    const pool=[]; for(let z=0;z<n;z++) if(z!==i) pool.push(z);
+    const m=pool.length;
+    let ext=0;
+    for(let p=0;p<nperm;p++){
+      let sum=0;
+      for(let d=0;d<k;d++){
+        const r=d+Math.floor(Math.random()*(m-d));
+        const tmp=pool[d];pool[d]=pool[r];pool[r]=tmp;
+        sum+=cen[pool[d]];
+      }
+      if(Math.abs(cen[i]*(sum/k)/vari)>=absIi)ext++;
+    }
+    const pval=(ext+1)/(nperm+1);
+    let cluster='ns';
+    if(pval<=alpha){
+      if(cen[i]>0&&wlag>0)     cluster='HH';
+      else if(cen[i]<0&&wlag<0)cluster='LL';
+      else if(cen[i]>0&&wlag<0)cluster='HL';
+      else                      cluster='LH';
+    }
+    results[id]={I:Ii,p:pval,cluster};
+  }
+  return results;
+}
+
+// Constrói a adjacência da ESCALA atual a partir da adjacência municipal (IBGE).
+// Município → TSE↔TSE | COREDE/Região → dois territórios são vizinhos se houver
+// municípios adjacentes pertencentes a cada um deles.
+function buildScaleAdj(scale,adjIbge){
+  if(scale==='municipio'){
+    const out={};
+    for(const[ibge,nbrs]of Object.entries(adjIbge)){
+      const tse=ST._cdMunToTse[String(ibge)];
+      if(!tse)continue;
+      out[tse]=(nbrs||[]).map(n=>ST._cdMunToTse[String(n)]).filter(Boolean);
+    }
+    return out;
+  }
+  const field=scale==='corede'?'cor':'reg';
+  const ibgeToGroup={};
+  for(const[ibge,tse]of Object.entries(ST._cdMunToTse)){
+    const m=ST.meta.municipios[tse];
+    if(m&&m[field])ibgeToGroup[String(ibge)]=m[field];
+  }
+  const out={};
+  for(const[ibge,nbrs]of Object.entries(adjIbge)){
+    const ga=ibgeToGroup[String(ibge)];if(!ga)continue;
+    if(!out[ga])out[ga]=new Set();
+    for(const n of(nbrs||[])){const gb=ibgeToGroup[String(n)];if(gb&&gb!==ga)out[ga].add(gb);}
+  }
+  const res={};for(const[k,s]of Object.entries(out))res[k]=[...s];return res;
+}
+
+async function renderClusters(){
+  const myRender=ST._renderSeq;
+  // LISA disponível em Município, COREDE e Região Intermediária
+  if(!['municipio','corede','reg_inter'].includes(ST.escala)){
+    showNota('Clusters disponíveis em Município, COREDE e Região');
+    ST.vista='areas';buildVistaChips();await renderChoropleth();return;
+  }
+  // COREDE/Região dependem de meta.municipios (vem vazio) → garantir bridge
+  if(!Object.keys(ST._cdMunToTse).length)await loadGeo('municipio');
+  const geo=await loadGeo(ST.escala);
+  const agg=getAgg();
+  if(!geo||!agg||!Object.keys(agg).length)return;
+  const adjIbge=await loadAdj();
+  const adjMap=buildScaleAdj(ST.escala,adjIbge);
+
+  // valMap keyed pela MESMA chave que featureKey produz
+  // (TSE p/ município, nome p/ COREDE/Região) → casamento direto no estilo do mapa.
+  const valMap={};
+  for(const[key,item]of Object.entries(agg)){
+    let v=0;
+    if(!ST.filter&&ST.metric&&ST.metric!=='winner')v=metricValueItem(item,ST.metric,true);
+    else if(!ST.filter)v=item.elet>0?item.tot/item.elet:0;
+    else if(ST.filter.type==='cand'){const nom=item.tot-item.bco-item.nul;v=nom>0?(item.c[String(ST.filter.value)]||0)/nom:0;}
+    else{v=item.tot>0?(item.p[ST.filter.value]||0)/item.tot:0;}
+    valMap[key]=v;
+  }
+
+  const ids=Object.keys(valMap);
+  showNota('Calculando clusters (499 permutações)...');
+  // Yield para não travar UI
+  await new Promise(r=>setTimeout(r,10));
+  const lisa=computeLISA(ids,valMap,adjMap,499,0.05);
+  ST._lisaCache=lisa;
+  document.getElementById('nota-escala').style.display='none';
+
+  const counts={HH:0,LL:0,HL:0,LH:0,ns:0};
+  for(const r of Object.values(lisa))counts[r.cluster]++;
+  const unidade=ST.escala==='municipio'?'mun.':ST.escala==='corede'?'COREDEs':'regiões';
+
+  if(myRender!==ST._renderSeq)return; // vista mudou durante o cálculo → aborta
+  GLAYER=L.geoJSON(geo,{
+    style:f=>{
+      const k=featureKey(f.properties);
+      const res=k?lisa[k]:null;
+      if(!res)return{fillColor:'#ccc',color:'#fff',weight:.5,fillOpacity:.3};
+      return{fillColor:LISA_CORES[res.cluster],color:'#fff',weight:.6,fillOpacity:res.cluster==='ns'?.25:.82};
+    },
+    onEachFeature:(f,layer)=>{
+      const k=featureKey(f.properties);
+      const res=k?lisa[k]:null;
+      const item=k?agg[k]:null;
+      const nm=item?.nm||f.properties.nome||f.properties.NM_MUN||'—';
+      const val=(k!=null&&valMap[k]!=null)?valMap[k]:0;
+      layer.bindTooltip(()=>`
+        <strong>${nm}</strong><br>
+        Cluster: <strong style="color:${LISA_CORES[res?.cluster||'ns']}">${LISA_LABELS[res?.cluster||'ns']}</strong><br>
+        ${(ST.filter?ST.filter.nome:(ST.metric&&ST.metric!=='winner'?METRIC_LBL[ST.metric]:'Comparecimento'))+': '+fp(val)}<br>
+        I local: ${res?.I?.toFixed(3)||'—'} · p=${res?.p?.toFixed(3)||'—'}
+        ${item?'<br>Eleitores: '+fn(item.elet):''}`,
+        {sticky:true,direction:'top'});
+      layer.on('mouseover',_=>{layer.setStyle({weight:2,color:'#333'});});
+      layer.on('mouseout',_=>{GLAYER.resetStyle(layer);});
+      layer.on('click',()=>onFeatureClick(k,nm,f,item));
+    }
+  }).addTo(MAP);
+
+  // Legenda LISA
+  const el=document.getElementById('legend-items');
+  el.innerHTML=Object.entries(LISA_CORES).map(([k,c])=>`
+    <div class="li">
+      <div class="li-sw" style="background:${c};opacity:${k==='ns'?.4:1}"></div>
+      <div class="li-nome">${LISA_LABELS[k]}</div>
+      <div class="li-r"><div class="li-abs">${counts[k]} ${unidade}</div></div>
+    </div>`).join('');
+
+  renderRightPanel(agg);
+
+  // Nota metodológica
+  const nota=document.createElement('div');
+  nota.className='rs';
+  const escLabel=ESCALAS_CFG.find(e=>e.id===ST.escala)?.label||'território';
+  nota.innerHTML=`
+    <div class="rs-title">Sobre os Clusters</div>
+    <div class="note">
+      <strong>LISA</strong> (Moran's I Local) com 499 permutações e α=0,05, na escala <strong>${escLabel}</strong>.<br>
+      Valor base: ${ST.filter?ST.filter.nome:(ST.metric&&ST.metric!=='winner'?METRIC_LBL[ST.metric]:'Comparecimento')}.<br>
+      <strong style="color:${LISA_CORES.HH}">Alto-Alto</strong>: alto rodeado de alto ·
+      <strong style="color:${LISA_CORES.LL}">Baixo-Baixo</strong>: baixo rodeado de baixo.<br>
+      <strong style="color:${LISA_CORES.HL}">Alto-Baixo</strong> /
+      <strong style="color:${LISA_CORES.LH}">Baixo-Alto</strong>: outliers espaciais.
+    </div>`;
+  document.getElementById('rp-content').appendChild(nota);
+}
+
+async function renderMap(){
+  ST._renderSeq++; // token: renders obsoletos (troca rápida de vista) não desenham
+  if(typeof buildGrandezaChips==='function')buildGrandezaChips();
+  clearMapLayers();
+  switch(ST.vista){
+    case'areas':    await renderChoropleth();break;
+    case'pontos':   await renderPontos();renderRightPanel(getAgg());buildLegend(getAgg());break;
+    case'calor':    await renderCalor();renderRightPanel(getAgg());buildLegend(getAgg());break;
+    case'clusters': await renderClusters();break;
+  }
+  updateMapLabel();
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUSCA DE CANDIDATOS / PARTIDOS
+// ═══════════════════════════════════════════════════════════
+function buildSearchList(){
+  if(!ST.munData)return[];
+  return ST.tab==='candidatos'
+    ?(ST.munData.candidatos||[]).map(c=>({type:'cand',value:c.nr,label:c.nm,sub:c.pt,cor:c.cor,v:c.v}))
+    :(ST.munData.partidos||[]).map(p=>({type:'partido',value:p.nm,label:p.nm,sub:'',cor:p.cor,v:p.v}));
+}
+
+function onSearchInput(q){
+  const dd=document.getElementById('sr-dropdown');
+  if(!q||q.length<2){dd.style.display='none';return;}
+  const norm=q.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  // Se partido selecionado, filtrar candidatos desse partido
+  const lista=buildSearchList().filter(i=>{
+    if(ST.filterParty&&i.type==='cand'){
+      const ci=(ST.munData?.candidatos||[]).find(c=>c.nr===i.value);
+      if(ci?.pt!==ST.filterParty.nm)return false;
+    }
+    return normNm(i.label).includes(norm);
+  }).slice(0,10);
+  if(!lista.length){dd.innerHTML='<div class="sr-empty">Nenhum resultado</div>';dd.style.display='block';return;}
+  dd.innerHTML=lista.map(m=>`
+    <div class="sr-item" onclick="selectSearch('${m.type}',${JSON.stringify(String(m.value))},${JSON.stringify(m.cor)},${JSON.stringify(m.label)})">
+      <div class="sr-dot" style="background:${m.cor}"></div>
+      <div class="sr-info"><div class="sr-nm">${m.label}</div>${m.sub?`<div class="sr-sub">${m.sub}</div>`:''}</div>
+      <div style="margin-left:auto;font-size:10px;color:var(--g400)">${fv(m.v)}</div>
+    </div>`).join('');
+  dd.style.display='block';
+}
+
+function selectSearch(type,value,cor,nome){
+  const inp=document.getElementById('search-input');
+  if(inp)inp.value=nome;
+  document.getElementById('sr-dropdown').style.display='none';
+  const v=type==='cand'?Number(value):value;
+  // Pré-computar vTotal para evitar lookup posterior
+  let vTotal=0;
+  if(type==='cand'){
+    const ci=(ST.munData?.candidatos||[]).find(c=>c.nr===v);
+    vTotal=ci?.v||0;
+    // Auto-setar filterParty se vindo de candidato
+    if(ci?.pt&&!ST.filterParty){
+      ST.filterParty={nm:ci.pt,cor:cor(ci.pt)};
+    }
+  }else{
+    const pi=(ST.munData?.partidos||[]).find(p=>p.nm===v);
+    vTotal=pi?.v||0;
+  }
+  // Fallback: se vTotal=0, calcular da soma dos municípios
+  if(vTotal===0&&ST.munData?.municipios){
+    for(const mun of Object.values(ST.munData.municipios)){
+      vTotal+=getVotesFromItem(mun,type,v);
+    }
+  }
+  // Ativar filter com vTotal embutido
+  ST.filter={type,value:v,cor,nome,vTotal};
+  document.getElementById('filter-pill').classList.add('on');
+  document.getElementById('filter-dot').style.background=cor;
+  document.getElementById('filter-label').textContent=nome;
+  renderMap();
+}
+
+function selectParty(nm,c){
+  ST.filterParty={nm,cor:c};
+  // Filtrar mapa por partido
+  ST.filter={type:'partido',value:nm,cor:c,nome:nm,vTotal:(ST.munData?.partidos||[]).find(p=>p.nm===nm)?.v||0};
+  document.getElementById('filter-pill').classList.add('on');
+  document.getElementById('filter-dot').style.background=c;
+  document.getElementById('filter-label').textContent=nm;
+  // Limpar busca e mostrar candidatos do partido
+  const inp=document.getElementById('search-input');
+  if(inp){inp.value='';inp.placeholder=`Buscar candidato do ${nm}...`;}
+  renderMap();
+}
+
+function clearSearch(){
+  const inp=document.getElementById('search-input');
+  if(inp){inp.value='';inp.placeholder=ST.tab==='candidatos'?'Buscar candidato...':'Buscar partido...';}
+  document.getElementById('sr-dropdown').style.display='none';
+  ST.filterParty=null;
+  clearFilter();
+}
+
+// ═══════════════════════════════════════════════════════════
+// PAINEL DIREITO
+// ═══════════════════════════════════════════════════════════
+function searchHTML(){
+  const ph=ST.filterParty?`Buscar candidato do ${ST.filterParty.nm}...`:
+           ST.tab==='candidatos'?'Buscar candidato...':'Buscar partido...';
+  const toggleHTML=ST.filter?`
+    <div style="display:flex;gap:3px;margin-top:6px">
+      <button onclick="setShowProp(false)" style="flex:1;padding:5px 0;font-size:10px;font-weight:700;border-radius:var(--r);border:2px solid ${!ST.showProp?'var(--black)':'var(--g200)'};background:${!ST.showProp?'var(--black)':'transparent'};color:${!ST.showProp?'var(--white)':'var(--g400)'}">Totais</button>
+      <button onclick="setShowProp(true)" style="flex:1;padding:5px 0;font-size:10px;font-weight:700;border-radius:var(--r);border:2px solid ${ST.showProp?'var(--black)':'var(--g200)'};background:${ST.showProp?'var(--black)':'transparent'};color:${ST.showProp?'var(--white)':'var(--g400)'}">Proporcionais</button>
+    </div>`:'';
+  const clearHTML=ST.filter?`<button onclick="clearSearch()" style="width:100%;margin-top:4px;padding:5px;font-size:10px;font-weight:600;color:var(--red);border:1px solid var(--red);border-radius:var(--r);background:transparent">✕ Limpar filtro</button>`:'';
+  return`<div class="search-wrap">
+    <div class="search-box">
+      <input id="search-input" class="search-input" type="text" placeholder="${ph}"
+        oninput="onSearchInput(this.value)"
+        onfocus="if(this.value.length>=2)document.getElementById('sr-dropdown').style.display='block'"
+        onblur="setTimeout(()=>{const d=document.getElementById('sr-dropdown');if(d)d.style.display='none'},180)"
+        value="${ST.filter?ST.filter.nome:''}"/>
+      <span class="search-icon">${ST.filter?'':'🔍'}</span>
+      <div id="sr-dropdown" class="sr-dropdown"></div>
+    </div>
+    ${toggleHTML}
+    ${clearHTML}
+  </div>`;
+}
+
+function statsHTML(item){
+  const comp=item.elet>0?item.tot/item.elet:0;
+  const nom=item.tot-item.bco-item.nul;
+  return`<div class="rs">
+    <div class="rs-title">Eleitorado e Comparecimento</div>
+    <div class="tg">
+      <div class="titem"><div class="ti-lbl">Eleitores Aptos</div><div class="ti-val">${fv(item.elet)}</div></div>
+      <div class="titem"><div class="ti-lbl">Comparecimento</div><div class="ti-val">${fp(comp)}</div><div class="ti-sub">${fv(item.tot)} votos</div></div>
+    </div>
+    <div class="tg3">
+      <div class="titem"><div class="ti-lbl">Válidos</div><div class="ti-val" style="font-size:12px">${fp(item.tot>0?nom/item.tot:0)}</div><div class="ti-sub">${fv(nom)}</div></div>
+      <div class="titem"><div class="ti-lbl">Brancos</div><div class="ti-val" style="font-size:12px">${fp(item.tot>0?item.bco/item.tot:0)}</div><div class="ti-sub">${fv(item.bco)}</div></div>
+      <div class="titem"><div class="ti-lbl">Nulos</div><div class="ti-val" style="font-size:12px">${fp(item.tot>0?item.nul/item.tot:0)}</div><div class="ti-sub">${fv(item.nul)}</div></div>
+    </div>
+  </div>`;
+}
+
+function filterCardHTML(agg){
+  if(!ST.filter)return'';
+  const{type,value,cor:fcor,nome,vTotal=0}=ST.filter;
+  const estado=ST.munData?.estado;
+  const nom_est=(estado?.tot||0)-(estado?.bco||0)-(estado?.nul||0);
+  const denom=type==='cand'?nom_est:(estado?.tot||1);
+  const pct=denom>0?vTotal/denom:0;
+  const pct_elet=(estado?.elet||0)>0?vTotal/estado.elet:0;
+  const ci=type==='cand'?(ST.munData?.candidatos||[]).find(c=>c.nr===Number(value)):null;
+  const sub=ci?.pt||'';
+  return`<div class="rs">
+    <div class="fcard" style="--fc:${fcor}">
+      <div class="fcard-nm">${nome}</div>
+      <div class="fcard-sub">${sub?sub+' · ':''}${CARGOS_CFG.find(c=>c.slug===ST.cargo)?.label||''} · ${ST.turno}º Turno</div>
+      <div class="fcard-stats">
+        <div class="fstat"><div class="fstat-lbl">Total RS</div><div class="fstat-val">${fv(vTotal)}</div></div>
+        <div class="fstat"><div class="fstat-lbl">% Válidos</div><div class="fstat-val">${fp(pct)}</div></div>
+        <div class="fstat"><div class="fstat-lbl">% Eleitorado</div><div class="fstat-val">${fp(pct_elet)}</div></div>
+        <div class="fstat"><div class="fstat-lbl">Situação</div><div class="fstat-val" style="font-size:10px">${ci?.sit||'—'}</div></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <button onclick="setShowProp(false)" style="flex:1;padding:5px;font-size:10px;font-weight:600;border-radius:var(--r);border:1px solid ${!ST.showProp?'var(--black)':'var(--g200)'};background:${!ST.showProp?'var(--black)':'transparent'};color:${!ST.showProp?'var(--white)':'var(--g600)'}">Totais</button>
+      <button onclick="setShowProp(true)" style="flex:1;padding:5px;font-size:10px;font-weight:600;border-radius:var(--r);border:1px solid ${ST.showProp?'var(--black)':'var(--g200)'};background:${ST.showProp?'var(--black)':'transparent'};color:${ST.showProp?'var(--white)':'var(--g600)'}">Proporcionais</button>
+    </div>
+    <button onclick="clearSearch()" style="width:100%;padding:6px;font-size:10px;color:var(--g400);border:1px solid var(--g200);border-radius:var(--r);margin-top:4px">✕ Limpar filtro</button>
+  </div>`;
+}
+
+function topTerritoriosHTML(agg){
+  if(!ST.filter||!agg)return'';
+  const{type,value,cor:fcor}=ST.filter;
+  const label=ESCALAS_CFG.find(e=>e.id===ST.escala)?.label||'Território';
+  const entries=Object.entries(agg).map(([k,item])=>{
+    const v=getVotesFromItem(item,type,value);
+    const denom=type==='cand'?((item.tot||0)-(item.bco||0)-(item.nul||0)):(item.tot||0);
+    const pct=denom>0?v/denom:0;
+    return{k,nm:item.nm||k,v,pct};
+  }).filter(e=>e.v>0).sort((a,b)=>ST.showProp?b.pct-a.pct:b.v-a.v).slice(0,15);
+  if(!entries.length)return`<div class="rs"><div class="hint-box" style="text-align:left">Nenhum dado encontrado para este candidato na escala atual.</div></div>`;
+  const maxV=Math.max(...entries.map(e=>ST.showProp?e.pct:e.v),1);
+  return`<div class="rs">
+    <div class="rs-title">Top ${label}s <span class="rs-hint">${ST.showProp?'(por %)':'(por votos)'}</span></div>
+    ${entries.map((e,i)=>`
+      <div class="trow" style="--tc:${fcor}" onclick="onTerrClick('${e.k}','${e.nm.replace(/'/g,"\\'")}')">
+        <div class="trow-rank">${i+1}</div>
+        <div class="trow-nm">${e.nm}</div>
+        <div class="trow-bar-wrap"><div class="trow-bar" style="width:${((ST.showProp?e.pct:e.v)/maxV*100).toFixed(1)}%"></div></div>
+        <div class="trow-pct">${fp(e.pct)}</div>
+        <div class="trow-abs">${fv(e.v)}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function onTerrClick(key,nome){
+  // Simula clique no mapa para o território
+  if(!GLAYER)return;
+  GLAYER.eachLayer(l=>{
+    if(!l.feature)return;
+    const k=featureKey(l.feature.properties);
+    if(k===key){l.fire('click');MAP.fitBounds(l.getBounds(),{padding:[20,20]});}
+  });
+}
+
+function partidosChipsHTML(){
+  const lista=ST.munData?.partidos||[];
+  if(!lista.length)return'';
+  return`<div class="rs">
+    <div class="rs-title">Filtrar por Partido</div>
+    <div class="chips" style="gap:4px">
+      ${lista.slice(0,20).map(p=>`
+        <button class="chip" style="border-color:${p.cor};color:${p.cor};font-size:10px;padding:3px 7px"
+          onclick="selectParty('${p.nm.replace(/'/g,"\\'")}','${p.cor.replace(/'/g,"\\'")}')">
+          ${p.nm}
+        </button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function renderRightPanel(agg){
+  if(!agg)return;
+  const cargo_cfg=CARGOS_CFG.find(c=>c.slug===ST.cargo);
+  const estado=ST.munData?.estado;
+  if(!estado)return;
+  const el=document.getElementById('rp-content');
+  const semFiltro=!ST.filter;
+
+  if(ST.escala==='estado'){
+    const item=agg['_RS_'];
+    if(!item)return;
+    el.innerHTML=`
+      <div class="rp-hdr"><div>
+        <div class="rp-title">Rio Grande do Sul</div>
+        <div class="rp-sub">${cargo_cfg?.label||''} · ${ST.turno}º Turno · 2022</div>
+      </div></div>
+      ${searchHTML()}
+      ${ST.filter?filterCardHTML(agg):partidosChipsHTML()}
+      ${statsHTML({elet:estado.elet,tot:estado.tot,bco:estado.bco,nul:estado.nul})}
+      ${ST.filter?topTerritoriosHTML(agg):''}`;
+    return;
+  }
+
+  el.innerHTML=`
+    <div class="rp-hdr"><div>
+      <div class="rp-title">Rio Grande do Sul</div>
+      <div class="rp-sub">${cargo_cfg?.label||''} · ${ST.turno}º Turno · 2022</div>
+    </div></div>
+    ${searchHTML()}
+    ${ST.filter?filterCardHTML(agg):partidosChipsHTML()}
+    ${statsHTML({elet:estado.elet,tot:estado.tot,bco:estado.bco,nul:estado.nul})}
+    ${ST.filter?topTerritoriosHTML(agg):`<div class="rs"><div class="hint-box">🔍 Busque um candidato ou selecione um partido acima. Clique em uma área do mapa para ver detalhes.</div></div>`}`;
+}
+
+function renderRightPanelItem(item,nome,showBack=true){
+  const el=document.getElementById('rp-content');
+  const cargo_cfg=CARGOS_CFG.find(c=>c.slug===ST.cargo);
+  const agg=getAgg();
+
+  // Votos do filtro neste item específico
+  let filterItemHTML='';
+  if(ST.filter&&item){
+    const {type,value,cor,nome:fnome}=ST.filter;
+    const v=type==='cand'?(item.c?.[String(value)]||0):(item.p?.[value]||0);
+    const denom=type==='cand'?((item.tot||0)-(item.bco||0)-(item.nul||0)):(item.tot||0);
+    const pct=denom>0?v/denom:0;
+    filterItemHTML=`<div class="rs">
+      <div class="rs-title">${fnome} nesta área</div>
+      <div class="fcard" style="--fc:${cor}">
+        <div class="fcard-stats">
+          <div class="fstat"><div class="fstat-lbl">Votos</div><div class="fstat-val">${fv(v)}</div></div>
+          <div class="fstat"><div class="fstat-lbl">% Válidos</div><div class="fstat-val">${fp(pct)}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML=`
+    <div class="rp-hdr">
+      <div><div class="rp-title">${nome}</div>
+      <div class="rp-sub">${cargo_cfg?.label||''} · ${ST.turno}º Turno · 2022</div></div>
+      ${showBack?`<button class="back-btn" onclick="clearTerritory()">← RS</button>`:''}
+    </div>
+    ${searchHTML()}
+    ${filterItemHTML}
+    ${item?statsHTML(item):''}
+    ${ST.filter&&agg?topTerritoriosHTML(agg):''}`;
+}
+
+function renderCards(item){
+  // Mantido para compatibilidade — não usado diretamente no novo painel
+  // mas pode ser chamado em contextos específicos
+  const nom=item.tot-item.bco-item.nul;
+  if(ST.tab==='candidatos'){
+    const list=ST.munData?.candidatos||[];
+    // CORRIDO: item.c pode ser undefined (ex: objeto 'estado') → usar .v da lista
+    const getV=nr=>item.c?(item.c[String(nr)]||0):(list.find(c=>c.nr===nr)?.v||0);
+    const sorted=[...list].sort((a,b)=>getV(b.nr)-getV(a.nr)).slice(0,20);
+    const maxV=Math.max(...sorted.map(c=>getV(c.nr)),1);
+    return sorted.map(c=>{
+      const v=getV(c.nr);if(v===0)return'';
+      const pct=nom>0?v/nom:0;
+      const filt=ST.filter?.type==='cand'&&String(ST.filter.value)===String(c.nr);
+      return`<div class="ccard ${filt?'filtered':''}" style="--pc:${c.cor}"
+        onclick="selectSearch('cand',${c.nr},'${c.cor.replace(/'/g,"\\'")}','${c.nm.replace(/'/g,"\\'")}')">
+        <div class="cdot"></div>
+        <div class="cinfo"><div class="cnome">${c.nm}</div><div class="cpart">${c.pt}</div></div>
+        <div class="cvotos"><div class="cpct">${fp(pct)}</div><div class="cabs">${fv(v)}</div></div>
+        <div class="cbar-wrap"><div class="cbar" style="width:${(v/maxV*100).toFixed(1)}%"></div></div>
+      </div>`;
+    }).join('');
+  }else{
+    const list=ST.munData?.partidos||[];
+    const getV=nm=>item.p?(item.p[nm]||0):(list.find(p=>p.nm===nm)?.v||0);
+    const sorted=[...list].sort((a,b)=>getV(b.nm)-getV(a.nm)).slice(0,20);
+    const maxV=Math.max(...sorted.map(p=>getV(p.nm)),1);
+    return sorted.map(p=>{
+      const v=getV(p.nm);if(v===0)return'';
+      const pct=item.tot>0?v/item.tot:0;
+      const filt=ST.filter?.type==='partido'&&ST.filter.value===p.nm;
+      return`<div class="ccard ${filt?'filtered':''}" style="--pc:${p.cor}"
+        onclick="selectSearch('partido','${p.nm.replace(/'/g,"\\'")}','${p.cor.replace(/'/g,"\\'")}','${p.nm.replace(/'/g,"\\'")}')">
+        <div class="cdot"></div>
+        <div class="cinfo"><div class="cnome">${p.nm}</div></div>
+        <div class="cvotos"><div class="cpct">${fp(pct)}</div><div class="cabs">${fv(v)}</div></div>
+        <div class="cbar-wrap"><div class="cbar" style="width:${(v/maxV*100).toFixed(1)}%"></div></div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEGENDA
+// ═══════════════════════════════════════════════════════════
+function buildLegend(agg){
+  if(!agg||!ST.munData)return;
+  const el=document.getElementById('legend-items');
+  const sc=getScalar();
+  if(sc.active){
+    const vals=Object.values(agg).map(item=>sc.valItem(item)).filter(v=>v!=null);
+    const breaks=quantileBreaks(vals);
+    const labels=['Muito baixo','Baixo','Médio','Alto','Muito alto'];
+    const fmt=b=>sc.prop?`≤${(b*100).toFixed(1)}%`:`≤${fv(b)}`;
+    el.innerHTML=`<div style="font-size:9px;color:var(--g600);font-weight:600;margin-bottom:6px">${sc.nome} ${sc.prop?'(%)':'(total)'}</div>`+
+      breaks.map((b,i)=>`
+      <div class="li">
+        <div class="li-sw" style="background:${h2r(sc.cor,0.12+i/4*.8)}"></div>
+        <div class="li-nome">${labels[i]}</div>
+        <div class="li-r"><div class="li-abs">${fmt(b)}</div></div>
+      </div>`).join('');
+    return;
+  }
+  const countByKey={};
+  for(const item of Object.values(agg)){
+    const w=getWinner(item);if(!w.key)continue;
+    const lbl=ST.tab==='candidatos'?w.nome:w.key;
+    if(!countByKey[lbl])countByKey[lbl]={cor:w.cor,count:0};
+    countByKey[lbl].count++;
+  }
+  el.innerHTML=Object.entries(countByKey).sort((a,b)=>b[1].count-a[1].count).slice(0,12).map(([lbl,info])=>`
+    <div class="li" onclick="toggleFilter('${ST.tab==='candidatos'?'cand':'partido'}','${lbl.replace(/'/g,"\\'")}','${info.cor.replace(/'/g,"\\'")}','${lbl.replace(/'/g,"\\'")}')">
+      <div class="li-sw" style="background:${info.cor}"></div>
+      <div class="li-nome">${lbl}</div>
+      <div class="li-r"><div class="li-abs">${info.count} loc.</div></div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONTROLES
+// ═══════════════════════════════════════════════════════════
+function setShowProp(v){ST.showProp=v;renderMap();}
+function setTab(tab){
+  ST.tab=tab;
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',['candidatos','partidos'][i]===tab));
+  clearFilter(false);renderMap();
+}
+async function setCargo(slug){
+  ST.cargo=slug;const cfg=CARGOS_CFG.find(c=>c.slug===slug);
+  ST.turno=cfg.turno[0];clearFilter(false);ST.territory=null;ST.territoryMun=null;
+  buildCargoChips();buildTurnoChips();
+  document.getElementById('turno-ps').style.display=cfg.turno.length>1?'':'none';
+  updateScopeBadge('Rio Grande do Sul');load(true);
+  try{ST.munData=null;ST.secoesData=null;await loadMunData(ST.cargo,ST.turno);await renderMap();}
+  finally{load(false);}
+}
+async function setTurno(t){
+  ST.turno=t;clearFilter(false);load(true);
+  try{ST.munData=null;ST.secoesData=null;await loadMunData(ST.cargo,ST.turno);await renderMap();}
+  finally{load(false);}
+  buildTurnoChips();
+}
+async function setEscala(id){
+  const intramun=['distrito','bairro'].includes(id);
+  if(intramun&&!ST.territoryMun){showNota('Selecione um município no mapa primeiro');return;}
+  ST.escala=id;buildEscalaChips();buildVistaChips();clearFilter(false);load(true);
+  try{
+    if(intramun){await loadSecoesBase();await loadSecoesData(ST.cargo,ST.turno);}
+    await renderMap();
+  }finally{load(false);}
+}
+function setVista(v){ST.vista=v;buildVistaChips();load(true);renderMap().finally(()=>load(false));}
+function toggleFilter(type,value,c,nome){
+  if(ST.filter&&ST.filter.type===type&&String(ST.filter.value)===String(value)){clearFilter();return;}
+  ST.filter={type,value,cor:c,nome};
+  const pill=document.getElementById('filter-pill');
+  document.getElementById('filter-dot').style.background=c;
+  document.getElementById('filter-label').textContent=nome;
+  pill.classList.add('on');renderMap();
+}
+function clearFilter(rerender=true){
+  ST.filter=null;
+  document.getElementById('filter-pill').classList.remove('on');
+  const inp=document.getElementById('search-input');
+  if(inp)inp.value='';
+  if(rerender)renderMap();
+}
+function clearTerritory(){
+  ST.territory=null;ST.territoryMun=null;
+  updateScopeBadge('Rio Grande do Sul');
+  renderRightPanel(getAgg());
+  if(GLAYER)GLAYER.eachLayer(l=>{if(l.feature)GLAYER.resetStyle(l);});
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUILDERS
+// ═══════════════════════════════════════════════════════════
+function buildCargoChips(){document.getElementById('cargo-chips').innerHTML=CARGOS_CFG.map(c=>`<button class="chip ${c.slug===ST.cargo?'on':''}" onclick="setCargo('${c.slug}')">${c.label}</button>`).join('');}
+function buildTurnoChips(){const cfg=CARGOS_CFG.find(c=>c.slug===ST.cargo);document.getElementById('turno-chips').innerHTML=(cfg?.turno||[1]).map(t=>`<button class="chip ${t===ST.turno?'on':''}" onclick="setTurno(${t})">${t}º Turno</button>`).join('');}
+function buildEscalaChips(){document.getElementById('escala-chips').innerHTML=ESCALAS_CFG.map(e=>`<button class="chip ${e.id===ST.escala?'on':''}" onclick="setEscala('${e.id}')">${e.label}</button>`).join('');}
+function buildVistaChips(){
+  // Vistas disponíveis por escala
+  const VISTA_MAP={
+    estado:    ['areas','pontos','calor'],
+    reg_inter: ['areas','pontos','calor','clusters'],
+    corede:    ['areas','pontos','calor','clusters'],
+    municipio: ['areas','pontos','calor','clusters'],
+    distrito:  ['areas','pontos','calor'],
+    bairro:    ['areas','pontos','calor'],
+  };
+  const permitidas=VISTA_MAP[ST.escala]||['areas'];
+  // Se vista atual não permitida nesta escala, voltar para áreas
+  if(!permitidas.includes(ST.vista)){ST.vista='areas';}
+  const todas=[{id:'areas',label:'Áreas'},{id:'pontos',label:'Pontos'},{id:'calor',label:'Calor'},{id:'clusters',label:'Clusters'}];
+  document.getElementById('vista-chips').innerHTML=todas
+    .filter(v=>permitidas.includes(v.id))
+    .map(v=>`<button class="chip vista-btn ${v.id===ST.vista?'on':''}" onclick="setVista('${v.id}')">${v.label}</button>`).join('');
+}
+// Seletor de grandeza: o que mapear (Vencedor / Comparecimento / Brancos / Nulos / Abstenção)
+function setMetric(m){
+  ST.metric=m;
+  if(m!=='winner'){ // métrica e filtro de candidato/partido são mutuamente exclusivos
+    ST.filter=null;ST.filterParty=null;
+    const pill=document.getElementById('filter-pill');if(pill)pill.classList.remove('on');
+  }
+  buildGrandezaChips();renderMap();
+}
+function buildGrandezaChips(){
+  const host=document.getElementById('grandeza-chips');if(!host)return;
+  const opts=[['winner','Vencedor'],['comp','Comparec.'],['bco','Brancos'],['nul','Nulos'],['abst','Abstenção']];
+  const act=id=>(!ST.filter&&ST.metric===id)?'on':'';
+  const showToggle=(!ST.filter&&ST.metric!=='winner');
+  host.innerHTML=opts.map(([id,l])=>`<button class="chip ${act(id)}" onclick="setMetric('${id}')">${l}</button>`).join('')
+   +`<div style="margin-top:6px;${showToggle?'':'display:none'}"><div style="display:flex;gap:3px">`
+   +`<button class="chip ${!ST.showProp?'on':''}" style="flex:1;text-align:center" onclick="setShowProp(false)">Total</button>`
+   +`<button class="chip ${ST.showProp?'on':''}" style="flex:1;text-align:center" onclick="setShowProp(true)">Proporcional</button></div></div>`;
+}
+function updateMapLabel(){
+  const cfg=CARGOS_CFG.find(c=>c.slug===ST.cargo);
+  document.getElementById('ml-cargo').textContent=(cfg?.label||'').toUpperCase();
+  document.getElementById('ml-titulo').textContent=`${ST.turno}º Turno · 2022`;
+}
+function updateScopeBadge(nome){
+  const badge=document.getElementById('scope-badge');
+  badge.textContent=nome.toUpperCase();
+  badge.classList.toggle('on',nome!=='Rio Grande do Sul');
+}
+function showNota(msg){
+  const el=document.getElementById('nota-escala');
+  el.textContent=msg;el.style.display='block';
+  setTimeout(()=>el.style.display='none',3500);
+}
+function load(on){document.getElementById('loading').classList.toggle('on',on);}
+
+// ═══════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════
+const MODALS={
+  metodo:{title:'Nota Metodológica',body:`
+    <h3>Fonte dos dados</h3>
+    <p>Tribunal Superior Eleitoral (TSE) — Eleições Gerais 2022, Rio Grande do Sul.</p>
+    <h3>Cargos</h3>
+    <p>Governador (1º e 2º turno), Senador, Deputado Federal e Deputado Estadual. Presidente não incluído.</p>
+    <h3>Candidatos cassados</h3>
+    <p>38 candidatos com registros retirados foram excluídos para coerência com os resultados oficiais. O caso mais expressivo é <strong>Nádia Rodrigues</strong> (Senado), que desistiu da corrida apoiando Hamilton Mourão — 80.300 votos anulados.</p>
+    <h3>Escalas territoriais</h3>
+    <p><span class="tag">Distrito</span> e <span class="tag">Bairro</span> são calculados pela soma das seções eleitorais em cada território. Municípios pequenos podem ter apenas um distrito.</p>
+    <h3>Votos de legenda</h3>
+    <p>Em <span class="tag">Partidos</span>, votos de legenda estão incluídos. Em <span class="tag">Candidatos</span>, apenas votos nominais.</p>
+    <h3>Clusters LISA</h3>
+    <p>Moran's I Local com 499 permutações e α=0,05. Identifica agrupamentos espaciais estatisticamente significativos. Disponível nas escalas Município, COREDE e Região, com a adjacência recalculada para cada abrangência.</p>
+    <h3>Cobertura espacial</h3>
+    <p>497 municípios · 27.429 seções. Coordenadas geocodificadas via OpenStreetMap e ArcGIS.</p>
+  `}
+};
+function showModal(id){const m=MODALS[id];if(!m)return;document.getElementById('modal-title').textContent=m.title;document.getElementById('modal-body').innerHTML=m.body;document.getElementById('modal-overlay').classList.add('on');}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('on');}
+
+// ═══════════════════════════════════════════════════════════
+// PDF
+// ═══════════════════════════════════════════════════════════
+function exportPDF(){
+  const cargo_cfg=CARGOS_CFG.find(c=>c.slug===ST.cargo);
+  const estado=ST.munData?.estado;
+  const comp=estado?estado.tot/estado.elet:0;
+  const abs=estado?(estado.elet-estado.tot)/estado.elet:0;
+  const top10=ST.tab==='candidatos'
+    ?(ST.munData?.candidatos||[]).slice(0,10).map(c=>`<tr><td>${c.nm}</td><td>${c.pt}</td><td>${fn(c.v)}</td><td>${fp(estado?.tot?(c.v/(estado.tot-estado.bco-estado.nul)):0)}</td></tr>`)
+    :(ST.munData?.partidos||[]).slice(0,10).map(p=>`<tr><td colspan="2">${p.nm}</td><td>${fn(p.v)}</td><td>${fp(estado?.tot?(p.v/estado.tot):0)}</td></tr>`);
+  document.getElementById('print-report').innerHTML=`
+    <style>body{font-family:'IBM Plex Sans',sans-serif;font-size:12px}h1{font-family:'Playfair Display',serif;font-size:22px;border-bottom:3px solid #C0001A;padding-bottom:8px;margin-bottom:16px}h2{font-size:14px;font-weight:700;margin:20px 0 8px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th{background:#0C0C0C;color:#fff;padding:6px 8px;font-size:10px;text-align:left}td{border-bottom:1px solid #EBEBEA;padding:5px 8px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}.card{background:#F4F4F2;border:1px solid #EBEBEA;padding:8px;border-radius:3px}.card-lbl{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#9A9A98;font-weight:600}.card-val{font-size:16px;font-weight:700}.footer{margin-top:24px;font-size:9px;color:#9A9A98;border-top:1px solid #EBEBEA;padding-top:8px}</style>
+    <h1>Atlas Eleitoral RS 2022 — ${cargo_cfg?.label||''} · ${ST.turno}º Turno</h1>
+    <p>${ST.filter?`<strong>Filtro:</strong> ${ST.filter.nome} &nbsp;·&nbsp; `:''}Gerado em ${new Date().toLocaleDateString('pt-BR')}</p>
+    <h2>Resumo Estadual</h2>
+    <div class="grid">
+      <div class="card"><div class="card-lbl">Eleitores</div><div class="card-val">${fv(estado?.elet||0)}</div></div>
+      <div class="card"><div class="card-lbl">Comparecimento</div><div class="card-val">${fp(comp)}</div></div>
+      <div class="card"><div class="card-lbl">Abstenção</div><div class="card-val">${fp(abs)}</div></div>
+      <div class="card"><div class="card-lbl">Brancos+Nulos</div><div class="card-val">${fp(estado?.tot?(((estado?.bco||0)+(estado?.nul||0))/estado.tot):0)}</div></div>
+    </div>
+    <h2>Top 10 — ${ST.tab==='candidatos'?'Candidatos':'Partidos'}</h2>
+    <table><tr><th>${ST.tab==='candidatos'?'Candidato':'Partido'}</th><th>${ST.tab==='candidatos'?'Partido':''}</th><th>Votos</th><th>%</th></tr>${top10.join('')}</table>
+    <div class="footer">Fonte: TSE 2022 · Atlas Eleitoral RS · Candidatos cassados excluídos.</div>`;
+  window.print();
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+async function init(){
+  initMap();
+  buildCargoChips();buildTurnoChips();buildEscalaChips();buildVistaChips();buildGrandezaChips();
+  document.getElementById('turno-ps').style.display='none';
+  load(true);
+  try{
+    await loadMeta();
+    await loadMunData(ST.cargo,ST.turno);
+    await renderMap();
+  }catch(e){
+    console.error('Init error:',e);
+    document.getElementById('rp-content').innerHTML=`<div class="empty" style="padding:32px 16px">⚠️ Erro ao carregar dados.<br><br>Coloque o <code>index.html</code> dentro da pasta <code>painel_web/</code> e rode:<br><code style="font-size:10px;color:#666">python -m http.server 8080</code></div>`;
+  }finally{load(false);}
+}
+window.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
