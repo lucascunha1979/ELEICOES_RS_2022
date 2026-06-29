@@ -52,7 +52,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .chip.on{background:var(--black);color:var(--white);border-color:var(--black)}
 .chip.vista-btn{border-radius:20px}
 .chip.vista-btn.on{background:var(--red);border-color:var(--red)}
-#legend-wrap{padding:12px 14px;flex:1;min-height:0}
+#legend-wrap{padding:12px 14px;flex-shrink:0}
 .leg-title{font-size:8px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--g400);margin-bottom:8px}
 #legend-items{display:flex;flex-direction:column;gap:3px}
 .li{display:flex;align-items:center;gap:7px;cursor:pointer;border-radius:var(--r);padding:4px 5px;transition:all var(--e)}
@@ -64,7 +64,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .li-pct{font-size:13px;font-weight:800;color:var(--black)}
 .li-abs{font-size:12px;color:var(--black);font-weight:700;margin-top:1px}
 .li-nome{font-size:12px}
-#lp-foot{padding:9px 14px;border-top:1px solid var(--g100);font-size:9px;color:var(--g400);line-height:1.6}
+#lp-foot{padding:9px 14px;border-top:1px solid var(--g100);font-size:9px;color:var(--g400);line-height:1.6;flex-shrink:0;margin-top:auto}
 #map-wrap{flex:1;position:relative;overflow:hidden}
 #map{width:100%;height:100%}
 #maplabel{position:absolute;top:10px;left:10px;z-index:500;background:rgba(248,248,246,.96);border:1px solid var(--g200);border-left:3px solid var(--red);padding:7px 11px;border-radius:var(--r);pointer-events:none;backdrop-filter:blur(4px)}
@@ -206,7 +206,6 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
       <div class="leg-title">Legenda — clique para filtrar</div>
       <div id="legend-items"><div style="font-size:11px;color:var(--g400);padding:4px">Carregando...</div></div>
     </div>
-    <div style="flex:1"></div>
     <div id="lp-foot">Fonte: TSE · Eleições Gerais 2022<br>RS · 497 municípios · 27.429 seções</div>
   </aside>
   <div id="map-wrap">
@@ -864,15 +863,13 @@ async function renderClusters(){
   const adjIbge=await loadAdj();
   const adjMap=buildScaleAdj(clScale,adjIbge);
 
-  // valMap keyed pela MESMA chave que featureKey produz
-  // (TSE p/ município, nome p/ COREDE/Região) → casamento direto no estilo do mapa.
+  // valMap keyed pela MESMA chave que featureKey produz.
+  // Usa o escalar ativo (candidato/partido OU grandeza) RESPEITANDO Total/Proporcional:
+  // assim o LISA muda ao alternar Total ↔ Proporcional (antes era fixo em proporção).
+  const sc=getScalar();
   const valMap={};
   for(const[key,item]of Object.entries(agg)){
-    let v=0;
-    if(!ST.filter&&ST.metric&&ST.metric!=='winner')v=metricValueItem(item,ST.metric,true);
-    else if(!ST.filter)v=item.elet>0?item.tot/item.elet:0;
-    else if(ST.filter.type==='cand'){const nom=item.tot-item.bco-item.nul;v=nom>0?(item.c[String(ST.filter.value)]||0)/nom:0;}
-    else{v=item.tot>0?(item.p[ST.filter.value]||0)/item.tot:0;}
+    const v=sc.valItem(item);
     valMap[key]=v;
   }
 
@@ -905,7 +902,7 @@ async function renderClusters(){
       layer.bindTooltip(()=>`
         <strong>${nm}</strong><br>
         Cluster: <strong style="color:${LISA_CORES[res?.cluster||'ns']}">${LISA_LABELS[res?.cluster||'ns']}</strong><br>
-        ${(ST.filter?ST.filter.nome:(ST.metric&&ST.metric!=='winner'?METRIC_LBL[ST.metric]:'Comparecimento'))+': '+fp(val)}<br>
+        ${sc.nome+': '+(ST.showProp?fp(val):fv(val))}<br>
         I local: ${res?.I?.toFixed(3)||'—'} · p=${res?.p?.toFixed(3)||'—'}
         ${item?'<br>Eleitores: '+fn(item.elet):''}`,
         {sticky:true,direction:'top'});
@@ -934,7 +931,7 @@ async function renderClusters(){
     <div class="rs-title">Sobre os Clusters</div>
     <div class="note">
       <strong>LISA</strong> (Moran's I Local) com 499 permutações e α=0,05, na escala <strong>${escLabel}</strong>.<br>
-      Valor base: ${ST.filter?ST.filter.nome:(ST.metric&&ST.metric!=='winner'?METRIC_LBL[ST.metric]:'Comparecimento')}.<br>
+      Valor base: ${sc.nome} (${ST.showProp?'proporcional':'total'}).<br>
       <strong style="color:${LISA_CORES.HH}">Alto-Alto</strong>: alto rodeado de alto ·
       <strong style="color:${LISA_CORES.LL}">Baixo-Baixo</strong>: baixo rodeado de baixo.<br>
       <strong style="color:${LISA_CORES.HL}">Alto-Baixo</strong> /
@@ -979,12 +976,17 @@ function onSearchInput(q){
     return normNm(i.label).includes(norm);
   }).slice(0,10);
   if(!lista.length){dd.innerHTML='<div class="sr-empty">Nenhum resultado</div>';dd.style.display='block';return;}
-  dd.innerHTML=lista.map(m=>`
-    <div class="sr-item" onclick="selectSearch('${m.type}',${JSON.stringify(String(m.value))},${JSON.stringify(m.cor)},${JSON.stringify(m.label)})">
+  // IMPORTANTE: usar SÓ aspas simples nos args do onclick. JSON.stringify gera
+  // aspas DUPLAS que quebram o atributo onclick="..." e impedem o clique no candidato.
+  const esc=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  dd.innerHTML=lista.map(m=>{
+    const valArg=m.type==='cand'?Number(m.value):`'${esc(m.value)}'`; // candidato = número; partido = string
+    return `<div class="sr-item" onclick="selectSearch('${m.type}',${valArg},'${esc(m.cor)}','${esc(m.label)}')">
       <div class="sr-dot" style="background:${m.cor}"></div>
       <div class="sr-info"><div class="sr-nm">${m.label}</div>${m.sub?`<div class="sr-sub">${m.sub}</div>`:''}</div>
       <div style="margin-left:auto;font-size:10px;color:var(--g400)">${fv(m.v)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   dd.style.display='block';
 }
 
