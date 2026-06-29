@@ -846,22 +846,60 @@ function buildScaleAdj(scale,adjIbge){
   const res={};for(const[k,s]of Object.entries(out))res[k]=[...s];return res;
 }
 
+// Adjacência intra-municipal (Distrito/Bairro): não há arquivo de vizinhança, então
+// usamos KNN dos centroides (média lat/lon das seções de cada distrito/bairro do município).
+function buildIntraMunAdj(field,k=6){
+  const groups={};
+  for(const s of (ST.secoesBase||[])){
+    if(s.cd!==ST.territoryMun)continue;
+    const key=s[field]; if(!key||s.lat==null||s.lon==null)continue;
+    if(!groups[key])groups[key]={lat:0,lon:0,n:0};
+    groups[key].lat+=s.lat;groups[key].lon+=s.lon;groups[key].n++;
+  }
+  const cents=Object.entries(groups).map(([key,g])=>({key,lat:g.lat/g.n,lon:g.lon/g.n}));
+  const K=Math.max(1,Math.min(k,cents.length-1));
+  const adj={};
+  for(const a of cents){
+    adj[a.key]=cents.filter(b=>b.key!==a.key)
+      .map(b=>({key:b.key,d:(a.lat-b.lat)**2+(a.lon-b.lon)**2}))
+      .sort((x,y)=>x.d-y.d).slice(0,K).map(x=>x.key);
+  }
+  for(const key of Object.keys(adj))for(const n of adj[key]){(adj[n]=adj[n]||[]);if(!adj[n].includes(key))adj[n].push(key);}
+  return adj;
+}
+
 async function renderClusters(){
   const myRender=ST._renderSeq;
-  // LISA disponível em Estado, Município, COREDE e Região.
-  // No Estado, o LISA é calculado por MUNICÍPIO (mostra os agrupamentos no RS todo).
-  if(!['estado','municipio','corede','reg_inter'].includes(ST.escala)){
-    showNota('Clusters disponíveis em Estado, Município, COREDE e Região');
+  const intramun=['distrito','bairro'].includes(ST.escala);
+  // LISA: Estado/Município/COREDE/Região (adjacência municipal) e Distrito/Bairro
+  // (adjacência por KNN dos centroides). No Estado, calcula por MUNICÍPIO.
+  if(!['estado','municipio','corede','reg_inter','distrito','bairro'].includes(ST.escala)){
+    showNota('Clusters indisponíveis nesta abrangência');
+    ST.vista='areas';buildVistaChips();await renderChoropleth();return;
+  }
+  if(intramun&&!ST.territoryMun){
+    showNota('Selecione um município no mapa primeiro');
     ST.vista='areas';buildVistaChips();await renderChoropleth();return;
   }
   const clScale=ST.escala==='estado'?'municipio':ST.escala;
   // COREDE/Região/Estado dependem de meta.municipios (vem vazio) → garantir bridge
   if(!Object.keys(ST._cdMunToTse).length)await loadGeo('municipio');
-  const geo=await loadGeo(clScale);
+  let geo=await loadGeo(clScale);
   const agg=getAgg(clScale);
   if(!geo||!agg||!Object.keys(agg).length)return;
-  const adjIbge=await loadAdj();
-  const adjMap=buildScaleAdj(clScale,adjIbge);
+  let adjMap, boundsTarget=null;
+  if(intramun){
+    if(!ST.secoesBase)await loadSecoesBase();
+    adjMap=buildIntraMunAdj(ST.escala==='distrito'?'dist':'bairro');
+    // filtra o GeoJSON para o município selecionado + zoom
+    const munNomeNorm=normNm(ST._tseToNm[String(ST.territoryMun)]||'');
+    const feats=geo.features.filter(f=>normNm(f.properties.NM_MUN||'')===munNomeNorm);
+    if(feats.length){geo={...geo,features:feats};boundsTarget=L.geoJSON({type:'FeatureCollection',features:feats}).getBounds();}
+    if(Object.keys(agg).length<4)showNota('Poucas unidades — clusters pouco informativos aqui');
+  }else{
+    const adjIbge=await loadAdj();
+    adjMap=buildScaleAdj(clScale,adjIbge);
+  }
 
   // valMap keyed pela MESMA chave que featureKey produz.
   // Usa o escalar ativo (candidato/partido OU grandeza) RESPEITANDO Total/Proporcional:
@@ -883,7 +921,7 @@ async function renderClusters(){
 
   const counts={HH:0,LL:0,HL:0,LH:0,ns:0};
   for(const r of Object.values(lisa))counts[r.cluster]++;
-  const unidade=clScale==='corede'?'COREDEs':clScale==='reg_inter'?'regiões':'mun.';
+  const unidade=clScale==='corede'?'COREDEs':clScale==='reg_inter'?'regiões':clScale==='distrito'?'distritos':clScale==='bairro'?'bairros':'mun.';
 
   if(myRender!==ST._renderSeq)return; // vista mudou durante o cálculo → aborta
   GLAYER=L.geoJSON(geo,{
@@ -911,6 +949,7 @@ async function renderClusters(){
       layer.on('click',()=>onFeatureClick(k,nm,f,item));
     }
   }).addTo(MAP);
+  if(boundsTarget)MAP.fitBounds(boundsTarget,{padding:[30,30],maxZoom:13}); // zoom no município (Distrito/Bairro)
 
   // Legenda LISA
   const el=document.getElementById('legend-items');
@@ -1337,7 +1376,8 @@ async function setTurno(t){
 async function setEscala(id){
   const intramun=['distrito','bairro'].includes(id);
   if(intramun&&!ST.territoryMun){showNota('Selecione um município no mapa primeiro');return;}
-  ST.escala=id;buildEscalaChips();buildVistaChips();clearFilter(false);load(true);
+  // NÃO limpar o filtro: o candidato/partido selecionado deve PERSISTIR ao trocar de abrangência.
+  ST.escala=id;buildEscalaChips();buildVistaChips();load(true);
   try{
     if(intramun){await loadSecoesBase();await loadSecoesData(ST.cargo,ST.turno);}
     await renderMap();
@@ -1379,8 +1419,8 @@ function buildVistaChips(){
     reg_inter: ['areas','pontos','calor','clusters'],
     corede:    ['areas','pontos','calor','clusters'],
     municipio: ['areas','pontos','calor','clusters'],
-    distrito:  ['areas','pontos','calor'],
-    bairro:    ['areas','pontos','calor'],
+    distrito:  ['areas','pontos','calor','clusters'],
+    bairro:    ['areas','pontos','calor','clusters'],
   };
   const permitidas=VISTA_MAP[ST.escala]||['areas'];
   // Se vista atual não permitida nesta escala, voltar para áreas
