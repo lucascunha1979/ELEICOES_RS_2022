@@ -265,7 +265,7 @@ const normNm=s=>(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/
 // ═══════════════════════════════════════════════════════════
 const ST={
   cargo:'dep_federal',turno:1,escala:'municipio',vista:'areas',tab:'candidatos',
-  filter:null,filterParty:null,showProp:false,metric:'winner',
+  filter:null,filterParty:null,showProp:false,metric:'comp',
   territory:null,territoryMun:null,
   meta:null,munData:null,secoesData:null,secoesBase:null,
   _cache:{},_sidIdx:{},
@@ -322,7 +322,19 @@ async function loadMunData(cargo,turno){
     ST.munData=null;return null;
   }
 }
-async function loadSecoesData(cargo,turno){ST.secoesData=await get(`${DATA}/secoes_${cargo}_t${turno}.json`);return ST.secoesData;}
+// Normaliza dados de seção para o formato INDEXADO (sids[] + arrays paralelos + c:{nr:[[idx,v]]}).
+// Alguns arquivos (ex.: secoes_senador_t1) vêm em formato SID-keyed: tot/bco/nul = {sid:v},
+// c/p = {chave:{sid:v}} e SEM sids. Esta função converte os dois para o mesmo formato.
+function normalizeSecoesData(sd){
+  if(!sd||sd.sids)return sd; // já indexado
+  const sids=Object.keys(sd.tot||{});
+  const idxOf={}; sids.forEach((s,i)=>idxOf[s]=i);
+  const tot=new Array(sids.length),bco=new Array(sids.length),nul=new Array(sids.length);
+  sids.forEach((s,i)=>{tot[i]=sd.tot[s]||0;bco[i]=(sd.bco&&sd.bco[s])||0;nul[i]=(sd.nul&&sd.nul[s])||0;});
+  const conv=obj=>{const out={};for(const[k,m]of Object.entries(obj||{})){const arr=[];for(const[s,v]of Object.entries(m)){const i=idxOf[s];if(i!==undefined)arr.push([i,v]);}out[k]=arr;}return out;};
+  return {cargo:sd.cargo,turno:sd.turno,sids,tot,bco,nul,c:conv(sd.c),p:conv(sd.p)};
+}
+async function loadSecoesData(cargo,turno){ST.secoesData=normalizeSecoesData(await get(`${DATA}/secoes_${cargo}_t${turno}.json`));return ST.secoesData;}
 async function loadGeo(scale){
   const cfg=ESCALAS_CFG.find(e=>e.id===scale);
   if(!cfg||!cfg.geo)return null;
@@ -414,10 +426,10 @@ function aggSecoesIntraMun(cdMun,field){
   }
   return result;
 }
-function getAgg(){
+function getAgg(scale=ST.escala){
   if(!ST.munData)return null;
   const md=ST.munData;
-  switch(ST.escala){
+  switch(scale){
     case'estado':{
       const e=md.estado;
       const agg={_RS_:{nm:'Rio Grande do Sul',elet:e.elet,tot:e.tot,bco:e.bco,nul:e.nul,c:{},p:{}}};
@@ -432,7 +444,7 @@ function getAgg(){
     case'municipio':{const agg={};for(const[cd,mun]of Object.entries(md.municipios))agg[cd]={...mun};return agg;}
     case'distrito':case'bairro':{
       if(!ST.territoryMun)return null;
-      return aggSecoesIntraMun(ST.territoryMun,ST.escala==='distrito'?'dist':'bairro');
+      return aggSecoesIntraMun(ST.territoryMun,scale==='distrito'?'dist':'bairro');
     }
     default:return null;
   }
@@ -492,21 +504,19 @@ function metricValueSecao(tot,bco,nul,elet,metric,prop){
     default:return 0;
   }
 }
-// Escalar ativo unificado: filtro de candidato/partido OU métrica selecionada.
-// .active=false → modo "Vencedor" (coroplético por líder).
+// Escalar ativo unificado. SEMPRE ativo:
+//   • com filtro → candidato/partido selecionado
+//   • sem filtro → grandeza (padrão: Comparecimento). Não existe mais modo "Vencedor".
 function getScalar(){
   if(ST.filter){
     return {active:true,isFilter:true,metric:null,cor:ST.filter.cor,nome:ST.filter.nome,prop:ST.showProp,
       valItem:item=>getFilterValue(item),
       absItem:item=>getVotesFromItem(item,ST.filter.type,ST.filter.value)};
   }
-  if(ST.metric&&ST.metric!=='winner'){
-    const m=ST.metric;
-    return {active:true,isFilter:false,metric:m,cor:METRIC_COR[m],nome:METRIC_LBL[m],prop:ST.showProp,
-      valItem:item=>metricValueItem(item,m,ST.showProp),
-      absItem:item=>metricValueItem(item,m,false)};
-  }
-  return {active:false};
+  const m=METRIC_LBL[ST.metric]?ST.metric:'comp';
+  return {active:true,isFilter:false,metric:m,cor:METRIC_COR[m],nome:METRIC_LBL[m],prop:ST.showProp,
+    valItem:item=>metricValueItem(item,m,ST.showProp),
+    absItem:item=>metricValueItem(item,m,false)};
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -538,8 +548,8 @@ function quantileColor(v,breaks,baseColor,minA=0.12,maxA=0.92){
 }
 
 // Obtém a chave de lookup na agg a partir das propriedades do feature
-function featureKey(props){
-  switch(ST.escala){
+function featureKey(props,scale=ST.escala){
+  switch(scale){
     case'estado':   return'_RS_';
     case'corede':   return props.nome;
     case'reg_inter':return props.nome;
@@ -832,18 +842,20 @@ function buildScaleAdj(scale,adjIbge){
 
 async function renderClusters(){
   const myRender=ST._renderSeq;
-  // LISA disponível em Município, COREDE e Região Intermediária
-  if(!['municipio','corede','reg_inter'].includes(ST.escala)){
-    showNota('Clusters disponíveis em Município, COREDE e Região');
+  // LISA disponível em Estado, Município, COREDE e Região.
+  // No Estado, o LISA é calculado por MUNICÍPIO (mostra os agrupamentos no RS todo).
+  if(!['estado','municipio','corede','reg_inter'].includes(ST.escala)){
+    showNota('Clusters disponíveis em Estado, Município, COREDE e Região');
     ST.vista='areas';buildVistaChips();await renderChoropleth();return;
   }
-  // COREDE/Região dependem de meta.municipios (vem vazio) → garantir bridge
+  const clScale=ST.escala==='estado'?'municipio':ST.escala;
+  // COREDE/Região/Estado dependem de meta.municipios (vem vazio) → garantir bridge
   if(!Object.keys(ST._cdMunToTse).length)await loadGeo('municipio');
-  const geo=await loadGeo(ST.escala);
-  const agg=getAgg();
+  const geo=await loadGeo(clScale);
+  const agg=getAgg(clScale);
   if(!geo||!agg||!Object.keys(agg).length)return;
   const adjIbge=await loadAdj();
-  const adjMap=buildScaleAdj(ST.escala,adjIbge);
+  const adjMap=buildScaleAdj(clScale,adjIbge);
 
   // valMap keyed pela MESMA chave que featureKey produz
   // (TSE p/ município, nome p/ COREDE/Região) → casamento direto no estilo do mapa.
@@ -867,18 +879,18 @@ async function renderClusters(){
 
   const counts={HH:0,LL:0,HL:0,LH:0,ns:0};
   for(const r of Object.values(lisa))counts[r.cluster]++;
-  const unidade=ST.escala==='municipio'?'mun.':ST.escala==='corede'?'COREDEs':'regiões';
+  const unidade=clScale==='corede'?'COREDEs':clScale==='reg_inter'?'regiões':'mun.';
 
   if(myRender!==ST._renderSeq)return; // vista mudou durante o cálculo → aborta
   GLAYER=L.geoJSON(geo,{
     style:f=>{
-      const k=featureKey(f.properties);
+      const k=featureKey(f.properties,clScale);
       const res=k?lisa[k]:null;
       if(!res)return{fillColor:'#ccc',color:'#fff',weight:.5,fillOpacity:.3};
       return{fillColor:LISA_CORES[res.cluster],color:'#fff',weight:.6,fillOpacity:res.cluster==='ns'?.25:.82};
     },
     onEachFeature:(f,layer)=>{
-      const k=featureKey(f.properties);
+      const k=featureKey(f.properties,clScale);
       const res=k?lisa[k]:null;
       const item=k?agg[k]:null;
       const nm=item?.nm||f.properties.nome||f.properties.NM_MUN||'—';
@@ -905,7 +917,7 @@ async function renderClusters(){
       <div class="li-r"><div class="li-abs">${counts[k]} ${unidade}</div></div>
     </div>`).join('');
 
-  renderRightPanel(agg);
+  renderRightPanel(getAgg()); // painel direito sempre na abrangência atual (Estado usa _RS_)
 
   // Nota metodológica
   const nota=document.createElement('div');
@@ -1357,7 +1369,7 @@ function buildEscalaChips(){document.getElementById('escala-chips').innerHTML=ES
 function buildVistaChips(){
   // Vistas disponíveis por escala
   const VISTA_MAP={
-    estado:    ['areas','pontos','calor'],
+    estado:    ['areas','pontos','calor','clusters'],
     reg_inter: ['areas','pontos','calor','clusters'],
     corede:    ['areas','pontos','calor','clusters'],
     municipio: ['areas','pontos','calor','clusters'],
@@ -1372,22 +1384,22 @@ function buildVistaChips(){
     .filter(v=>permitidas.includes(v.id))
     .map(v=>`<button class="chip vista-btn ${v.id===ST.vista?'on':''}" onclick="setVista('${v.id}')">${v.label}</button>`).join('');
 }
-// Seletor de grandeza: o que mapear (Vencedor / Comparecimento / Brancos / Nulos / Abstenção)
+// Seletor de grandeza: o que mapear quando NENHUM candidato/partido está selecionado.
+// (Comparecimento / Brancos / Nulos / Abstenção). Não há mais modo "Vencedor".
 function setMetric(m){
   ST.metric=m;
-  if(m!=='winner'){ // métrica e filtro de candidato/partido são mutuamente exclusivos
-    ST.filter=null;ST.filterParty=null;
-    const pill=document.getElementById('filter-pill');if(pill)pill.classList.remove('on');
-  }
+  // métrica e filtro de candidato/partido são mutuamente exclusivos
+  ST.filter=null;ST.filterParty=null;
+  const pill=document.getElementById('filter-pill');if(pill)pill.classList.remove('on');
   buildGrandezaChips();renderMap();
 }
 function buildGrandezaChips(){
   const host=document.getElementById('grandeza-chips');if(!host)return;
-  const opts=[['winner','Vencedor'],['comp','Comparec.'],['bco','Brancos'],['nul','Nulos'],['abst','Abstenção']];
+  const opts=[['comp','Comparec.'],['bco','Brancos'],['nul','Nulos'],['abst','Abstenção']];
   const act=id=>(!ST.filter&&ST.metric===id)?'on':'';
-  const showToggle=(!ST.filter&&ST.metric!=='winner');
-  host.innerHTML=opts.map(([id,l])=>`<button class="chip ${act(id)}" onclick="setMetric('${id}')">${l}</button>`).join('')
-   +`<div style="margin-top:6px;${showToggle?'':'display:none'}"><div style="display:flex;gap:3px">`
+  const sub=ST.filter?`<div class="rs-hint" style="margin-bottom:6px">Mostrando: <strong>${ST.filter.nome}</strong> — clique numa grandeza para voltar</div>`:'';
+  host.innerHTML=sub+opts.map(([id,l])=>`<button class="chip ${act(id)}" onclick="setMetric('${id}')">${l}</button>`).join('')
+   +`<div style="margin-top:6px"><div style="display:flex;gap:3px">`
    +`<button class="chip ${!ST.showProp?'on':''}" style="flex:1;text-align:center" onclick="setShowProp(false)">Total</button>`
    +`<button class="chip ${ST.showProp?'on':''}" style="flex:1;text-align:center" onclick="setShowProp(true)">Proporcional</button></div></div>`;
 }
