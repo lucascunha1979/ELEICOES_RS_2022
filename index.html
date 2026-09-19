@@ -107,6 +107,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .cbar{height:100%;border-radius:1px;background:var(--pc,var(--g400));transition:width .4s}
 .note{background:var(--g50);border:1px solid var(--g100);border-left:3px solid var(--g200);border-radius:var(--r);padding:6px 10px;font-size:10px;color:var(--g600);line-height:1.5;margin-bottom:8px}
 .empty{padding:24px 14px;text-align:center;color:var(--g400);font-size:12px}
+.chip-metric.on{background:var(--black);color:var(--white);border-color:var(--black)}
 /* BUSCA */
 .search-wrap{padding:10px 14px;border-bottom:1px solid var(--g100);position:sticky;top:0;background:var(--white);z-index:11}
 .search-box{position:relative}
@@ -197,6 +198,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
     <div class="ps" id="turno-ps" style="display:none"><div class="slabel">Turno</div><div class="chips" id="turno-chips"></div></div>
     <div class="ps"><div class="slabel">Escala Territorial</div><div class="chips" id="escala-chips"></div></div>
     <div class="ps"><div class="slabel">Visualização</div><div class="chips" id="vista-chips"></div></div>
+    <div class="ps" id="grandeza-ps"><div class="slabel">O que mapear</div><div class="chips" id="grandeza-chips"></div></div>
     <div id="legend-wrap">
       <div class="leg-title">Legenda — clique para filtrar</div>
       <div id="legend-items"><div style="font-size:11px;color:var(--g400);padding:4px">Carregando...</div></div>
@@ -264,7 +266,7 @@ const normNm=s=>(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/
 // ═══════════════════════════════════════════════════════════
 const ST={
   cargo:'dep_federal',turno:1,escala:'municipio',vista:'areas',tab:'candidatos',
-  filter:null,filterParty:null,showProp:false,
+  filter:null,filterParty:null,showProp:false,metric:null,
   territory:null,territoryMun:null,
   meta:null,munData:null,secoesData:null,secoesBase:null,
   _cache:{},_sidIdx:{},
@@ -455,6 +457,19 @@ function getWinner(item){
   const pct=total>0?maxV/total:0;
   return{key:maxK,cor:c,pct,nome};
 }
+function getScalarValue(item){
+  // Retorna o valor a usar para colorir: grandeza OU filtro de candidato
+  if(ST.metric) return getMetricValue(item, ST.showProp);
+  if(ST.filter) return getFilterValue(item);
+  return null;
+}
+
+function getScalarColor(){
+  if(ST.metric) return getMetricColor();
+  if(ST.filter) return ST.filter.cor;
+  return '#888';
+}
+
 function getFilterValue(item){
   if(!ST.filter||!item)return null;
   const{type,value}=ST.filter;
@@ -653,6 +668,20 @@ async function renderPontos(){
   const secVals=sbFiltrado.map(sec=>{
     const idx=sidToIdx[sec.sid];
     if(idx===undefined)return 0;
+    // Grandeza ativa: calcular com base nos totais da seção
+    if(ST.metric){
+      const tot=sd.tot[idx]||0;
+      const bco=sd.bco[idx]||0;
+      const nul=sd.nul[idx]||0;
+      const elet=sec.elet||1;
+      const abst=elet-tot;
+      switch(ST.metric){
+        case'comp': return ST.showProp?(tot/elet):tot;
+        case'bco':  return ST.showProp?(bco/tot):bco;
+        case'nul':  return ST.showProp?(nul/tot):nul;
+        case'abst': return ST.showProp?(abst/elet):abst;
+      }
+    }
     if(!ST.filter)return sd.tot[idx]||0;
     if(ST.filter.type==='cand'){
       for(const[i2,v]of(sd.c[String(ST.filter.value)]||[])){if(i2===idx)return v;}
@@ -668,9 +697,11 @@ async function renderPontos(){
   for(let i=0;i<sbFiltrado.length;i++){
     const sec=sbFiltrado[i];const v=secVals[i];
     if(v<=0&&ST.filter)continue;
-    const c=ST.filter?ST.filter.cor:'#C0001A';
+    const c=ST.metric?getMetricColor():(ST.filter?ST.filter.cor:'#C0001A');
+    const lbl=ST.metric?(METRICAS.find(m=>m.id===ST.metric)?.label||''):(ST.filter?ST.filter.nome:'');
+    const vFmt=ST.showProp&&ST.metric?fp(v):fn(v);
     const circle=L.circleMarker([sec.lat,sec.lon],{radius:getR(v),color:c,fillColor:c,weight:.5,fillOpacity:v>0?.75:.2,opacity:v>0?.75:.2});
-    circle.bindTooltip(`<strong>${sec.mun}</strong><br>Zona ${sec.sid.split('_')[1]} · Seção ${sec.sid.split('_')[2]}<br>${ST.filter?ST.filter.nome+': '+fn(v)+'<br>':''}Eleitores: ${fn(sec.elet)}`,{sticky:true,direction:'top'});
+    circle.bindTooltip(`<strong>${sec.mun}</strong><br>Zona ${sec.sid.split('_')[1]} · Seção ${sec.sid.split('_')[2]}<br>${lbl?lbl+': '+vFmt+'<br>':''}Eleitores: ${fn(sec.elet)}`,{sticky:true,direction:'top'});
     markers.push(circle);
   }
   PLAYER=L.layerGroup(markers).addTo(MAP);
@@ -700,7 +731,18 @@ async function renderCalor(){
   for(const sec of sbCalor){
     const idx=sidToIdx[sec.sid];if(idx===undefined)continue;
     let v=0;
-    if(!ST.filter)v=sd.tot[idx]||0;
+    const tot_s=sd.tot[idx]||0;
+    const bco_s=sd.bco?sd.bco[idx]||0:0;
+    const nul_s=sd.nul?sd.nul[idx]||0:0;
+    const elet_s=sec.elet||1;
+    if(ST.metric){
+      switch(ST.metric){
+        case'comp': v=ST.showProp?(tot_s/elet_s):tot_s; break;
+        case'bco':  v=ST.showProp?(bco_s/tot_s):bco_s; break;
+        case'nul':  v=ST.showProp?(nul_s/tot_s):nul_s; break;
+        case'abst': v=ST.showProp?((elet_s-tot_s)/elet_s):(elet_s-tot_s); break;
+      }
+    }else if(!ST.filter)v=tot_s;
     else if(ST.filter.type==='cand'){for(const[i2,vv]of(sd.c[String(ST.filter.value)]||[])){if(i2===idx){v=vv;break;}}}
     else{for(const[i2,vv]of(sd.p[ST.filter.value]||[])){if(i2===idx){v=vv;break;}}}
     if(v>0)heatData.push([sec.lat,sec.lon,v]);
@@ -914,6 +956,7 @@ function selectSearch(type,value,cor,nome){
     }
   }
   // Ativar filter com vTotal embutido
+  ST.metric=null;buildGrandezaChips();
   ST.filter={type,value:v,cor,nome,vTotal};
   document.getElementById('filter-pill').classList.add('on');
   document.getElementById('filter-dot').style.background=cor;
@@ -1182,14 +1225,15 @@ function renderCards(item){
 function buildLegend(agg){
   if(!agg||!ST.munData)return;
   const el=document.getElementById('legend-items');
-  if(ST.filter){
-    const vals=Object.values(agg).map(item=>getFilterValue(item)).filter(v=>v!=null);
+  if(ST.metric||ST.filter){
+    const filterCor=ST.metric?getMetricColor():(ST.filter?.cor||'#888');
+    const vals=Object.values(agg).map(item=>ST.metric?getMetricValue(item,ST.showProp):getFilterValue(item)).filter(v=>v!=null);
     const breaks=quantileBreaks(vals);
     const labels=['Muito baixo','Baixo','Médio','Alto','Muito alto'];
     const fmt=b=>ST.showProp?`≤${(b*100).toFixed(1)}%`:`≤${fv(b)}`;
     el.innerHTML=breaks.map((b,i)=>`
       <div class="li">
-        <div class="li-sw" style="background:${h2r(ST.filter.cor,0.12+i/4*.8)}"></div>
+        <div class="li-sw" style="background:${h2r(filterCor,0.12+i/4*.8)}"></div>
         <div class="li-nome">${labels[i]}</div>
         <div class="li-r"><div class="li-abs">${fmt(b)}</div></div>
       </div>`).join('');
@@ -1253,7 +1297,7 @@ function toggleFilter(type,value,c,nome){
   pill.classList.add('on');renderMap();
 }
 function clearFilter(rerender=true){
-  ST.filter=null;
+  ST.filter=null;ST.filterParty=null;
   document.getElementById('filter-pill').classList.remove('on');
   const inp=document.getElementById('search-input');
   if(inp)inp.value='';
@@ -1272,6 +1316,61 @@ function clearTerritory(){
 function buildCargoChips(){document.getElementById('cargo-chips').innerHTML=CARGOS_CFG.map(c=>`<button class="chip ${c.slug===ST.cargo?'on':''}" onclick="setCargo('${c.slug}')">${c.label}</button>`).join('');}
 function buildTurnoChips(){const cfg=CARGOS_CFG.find(c=>c.slug===ST.cargo);document.getElementById('turno-chips').innerHTML=(cfg?.turno||[1]).map(t=>`<button class="chip ${t===ST.turno?'on':''}" onclick="setTurno(${t})">${t}º Turno</button>`).join('');}
 function buildEscalaChips(){document.getElementById('escala-chips').innerHTML=ESCALAS_CFG.map(e=>`<button class="chip ${e.id===ST.escala?'on':''}" onclick="setEscala('${e.id}')">${e.label}</button>`).join('');}
+// ═══════════════════════════════════════════════════════════
+// GRANDEZA (O que mapear)
+// ═══════════════════════════════════════════════════════════
+const METRICAS=[
+  {id:'comp', label:'Comparecimento', cor:'#1D4ED8'},
+  {id:'bco',  label:'Brancos',        cor:'#6B7280'},
+  {id:'nul',  label:'Nulos',          cor:'#D97706'},
+  {id:'abst', label:'Abstenção',      cor:'#111827'},
+];
+
+function buildGrandezaChips(){
+  const el=document.getElementById('grandeza-chips');
+  if(!el)return;
+  el.innerHTML=METRICAS.map(m=>
+    `<button class="chip chip-metric ${ST.metric===m.id?'on':''}"
+      style="${ST.metric===m.id?'':''}border-left:3px solid ${m.cor}"
+      onclick="setMetric('${m.id}')">${m.label}</button>`
+  ).join('');
+}
+
+function setMetric(id){
+  if(ST.metric===id){
+    // Desativar — voltar ao modo padrão
+    ST.metric=null;
+  }else{
+    ST.metric=id;
+    // Limpar filtro de candidato ao ativar grandeza
+    ST.filter=null;
+    ST.filterParty=null;
+    document.getElementById('filter-pill').classList.remove('on');
+    const inp=document.getElementById('search-input');
+    if(inp)inp.value='';
+  }
+  buildGrandezaChips();
+  renderMap();
+}
+
+function getMetricValue(item, proporcional){
+  if(!item)return null;
+  const elet=item.elet||1;
+  const tot=item.tot||0;
+  const abst=elet-tot;
+  switch(ST.metric){
+    case'comp': return proporcional?(tot/elet)      :tot;
+    case'bco':  return proporcional?(item.bco/tot)  :item.bco;
+    case'nul':  return proporcional?(item.nul/tot)  :item.nul;
+    case'abst': return proporcional?(abst/elet)     :abst;
+    default:    return null;
+  }
+}
+
+function getMetricColor(){
+  return METRICAS.find(m=>m.id===ST.metric)?.cor||'#1D4ED8';
+}
+
 function buildVistaChips(){
   // Vistas disponíveis por escala
   const VISTA_MAP={
@@ -1370,7 +1469,7 @@ function exportPDF(){
 // ═══════════════════════════════════════════════════════════
 async function init(){
   initMap();
-  buildCargoChips();buildTurnoChips();buildEscalaChips();buildVistaChips();
+  buildCargoChips();buildTurnoChips();buildEscalaChips();buildVistaChips();buildGrandezaChips();
   document.getElementById('turno-ps').style.display='none';
   load(true);
   try{
