@@ -946,7 +946,7 @@ function onSearchInput(q){
   }).slice(0,10);
   if(!lista.length){dd.innerHTML='<div class="sr-empty">Nenhum resultado</div>';dd.style.display='block';return;}
   dd.innerHTML=lista.map(m=>`
-    <div class="sr-item" onclick="selectSearch('${m.type}',${JSON.stringify(String(m.value))},${JSON.stringify(m.cor)},${JSON.stringify(m.label)})">
+    <div class="sr-item" onmousedown="event.preventDefault();selectSearch('${m.type}',${JSON.stringify(String(m.value))},${JSON.stringify(m.cor)},${JSON.stringify(m.label)})">
       <div class="sr-dot" style="background:${m.cor}"></div>
       <div class="sr-info"><div class="sr-nm">${m.label}</div>${m.sub?`<div class="sr-sub">${m.sub}</div>`:''}</div>
       <div style="margin-left:auto;font-size:10px;color:var(--g400)">${fv(m.v)}</div>
@@ -1019,11 +1019,12 @@ function searchHTML(){
       <button onclick="setShowProp(false)" style="flex:1;padding:5px 0;font-size:10px;font-weight:700;border-radius:var(--r);border:2px solid ${!ST.showProp?'var(--black)':'var(--g200)'};background:${!ST.showProp?'var(--black)':'transparent'};color:${!ST.showProp?'var(--white)':'var(--g400)'}">Totais</button>
       <button onclick="setShowProp(true)" style="flex:1;padding:5px 0;font-size:10px;font-weight:700;border-radius:var(--r);border:2px solid ${ST.showProp?'var(--black)':'var(--g200)'};background:${ST.showProp?'var(--black)':'transparent'};color:${ST.showProp?'var(--white)':'var(--g400)'}">Proporcionais</button>
     </div>`:'';
-  const clearHTML=ST.filter?`<button onclick="clearSearch()" style="width:100%;margin-top:4px;padding:5px;font-size:10px;font-weight:600;color:var(--red);border:1px solid var(--red);border-radius:var(--r);background:transparent">✕ Limpar filtro</button>`:'';
+  const clearHTML=(ST.filter||ST.metric)?`<button onclick="clearSearch();ST.metric=null;buildGrandezaChips();renderMap();" style="width:100%;margin-top:4px;padding:5px;font-size:10px;font-weight:600;color:var(--red);border:1px solid var(--red);border-radius:var(--r);background:transparent">✕ Limpar filtro</button>`:'';
   return`<div class="search-wrap">
     <div class="search-box">
       <input id="search-input" class="search-input" type="text" placeholder="${ph}"
         oninput="onSearchInput(this.value)"
+        onkeydown="if(event.key==='Enter'){const f=document.querySelector('#sr-dropdown .sr-item');if(f)f.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));}"
         onfocus="if(this.value.length>=2)document.getElementById('sr-dropdown').style.display='block'"
         onblur="setTimeout(()=>{const d=document.getElementById('sr-dropdown');if(d)d.style.display='none'},180)"
         value="${ST.filter?ST.filter.nome:''}"/>
@@ -1262,22 +1263,7 @@ function buildLegend(agg){
       </div>`).join('');
     return;
   }
-  const countByKey={};
-  for(const item of Object.values(agg)){
-    const w=getWinner(item);if(!w.key)continue;
-    const lbl=ST.tab==='candidatos'?w.nome:w.key;
-    if(!countByKey[lbl])countByKey[lbl]={cor:w.cor,count:0};
-    countByKey[lbl].count++;
-  }
-  el.innerHTML=Object.entries(countByKey)
-    .sort((a,b)=>b[1].count-a[1].count).slice(0,5)
-    .map(([lbl,info])=>`
-      <div class="li">
-        <div class="li-sw" style="background:${info.cor}"></div>
-        <div class="li-nome">${lbl.length>24?lbl.slice(0,24)+'…':lbl}</div>
-        <div class="li-r"><div class="li-abs">${info.count} mun.</div></div>
-      </div>`).join('')
-    +'<div style="font-size:10px;color:var(--g400);padding:6px 2px">Use a busca ou selecione uma grandeza.</div>';
+  const el.innerHTML='<div style="font-size:11px;color:var(--g400);padding:6px 2px;line-height:1.6">Use a busca ou selecione uma grandeza para filtrar o mapa.</div>';
 }
 
 // ═══════════════════════════════════════════════════════════
