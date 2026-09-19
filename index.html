@@ -513,7 +513,7 @@ function featureKey(props){
 }
 
 async function renderChoropleth(){
-  const geo=await loadGeo(ST.escala);
+  let geo=await loadGeo(ST.escala);
   const agg=getAgg();
   if(!agg)return;
   if(ST.escala==='estado'){renderRightPanel(agg);buildLegend(agg);return;}
@@ -1379,7 +1379,7 @@ async function init(){
     await renderMap();
   }catch(e){
     console.error('Init error:',e);
-    document.getElementById('rp-content').innerHTML=`<div class="empty" style="padding:32px 16px">⚠️ Erro ao carregar dados.<br><br>Coloque o <code>index.html</code> dentro da pasta <code>painel_web/</code> e rode:<br><code style="font-size:10px;color:#666">python -m http.server 8080</code></div>`;
+    document.getElementById('rp-content').innerHTML=`<div class="empty" style="padding:32px 16px">⚠️ Erro ao carregar dados.<br><br>Verifique a conexão e recarregue a página.<br><small style="color:#999">${e?.message||''}</small></div>`;
   }finally{load(false);}
 }
 window.addEventListener('DOMContentLoaded',init);
