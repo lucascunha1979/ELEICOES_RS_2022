@@ -552,19 +552,35 @@ async function renderChoropleth(){
     }
   }
   geo = geoFiltrado;
+  // Calcular breaks para grandeza OU filtro
+  const useQuantile=ST.metric||ST.filter;
+  const quantileCor=ST.metric?getMetricColor():(ST.filter?.cor||'#888');
   const vals=[];
-  if(ST.filter){for(const item of Object.values(agg)){const v=getFilterValue(item);if(v!=null)vals.push(v);}}
-  const breaks=ST.filter?quantileBreaks(vals):[];
+  if(useQuantile){
+    for(const item of Object.values(agg)){
+      const v=ST.metric?getMetricValue(item,ST.showProp):getFilterValue(item);
+      if(v!=null)vals.push(v);
+    }
+  }
+  const breaks=useQuantile?quantileBreaks(vals):[];
   GLAYER=L.geoJSON(geoFiltrado||geo,{
     style:f=>{
       const k=featureKey(f.properties);
       const item=k?agg[k]:null;
       if(!item)return{fillColor:'#CCC',color:'#FFF',weight:.6,fillOpacity:.2};
+      // Grandeza ativa
+      if(ST.metric){
+        const v=getMetricValue(item,ST.showProp);
+        const fc=quantileColor(v,breaks,quantileCor);
+        return{fillColor:fc,color:quantileCor,weight:.6,fillOpacity:.85};
+      }
+      // Filtro de candidato/partido
       if(ST.filter){
         const v=getFilterValue(item);
         const fc=quantileColor(v,breaks,ST.filter.cor);
         return{fillColor:fc,color:v>0?ST.filter.cor:'#FFF',weight:v>0?.8:.4,fillOpacity:v>0?.85:.2};
       }
+      // Modo padrão: vencedor
       const w=getWinner(item);
       const op=w.pct<.5?.45:w.pct<.6?.6:w.pct<.72?.75:.9;
       return{fillColor:w.cor,color:'#FFF',weight:.7,fillOpacity:op};
@@ -578,9 +594,16 @@ async function renderChoropleth(){
         const w=getWinner(item);
         const comp=item.elet>0?item.tot/item.elet:0;
         const fv2=(n,d)=>d>0?fp(n/d):'—';
-        const fVal=ST.filter?fv2(getVotesFromItem(item,ST.filter.type,ST.filter.value),(ST.tab==='candidatos'?(item.tot-item.bco-item.nul):item.tot)):'';
+        let fVal='';
+        if(ST.metric){
+          const mv=getMetricValue(item,true);
+          fVal=fp(mv);
+        }else if(ST.filter){
+          fVal=fv2(getVotesFromItem(item,ST.filter.type,ST.filter.value),(ST.tab==='candidatos'?(item.tot-item.bco-item.nul):item.tot));
+        }
+        const metricLabel=ST.metric?(METRICAS.find(m=>m.id===ST.metric)?.label||''):'';
         return`<strong>${nm}</strong><br>
-          ${ST.filter?ST.filter.nome+': <strong>'+fVal+'</strong><br>':'Líder: <strong>'+w.nome+'</strong> · '+fp(w.pct)+'<br>'}
+          ${ST.metric?metricLabel+': <strong>'+fVal+'</strong><br>':ST.filter?ST.filter.nome+': <strong>'+fVal+'</strong><br>':'Líder: <strong>'+w.nome+'</strong> · '+fp(w.pct)+'<br>'}
           Comp.: ${fp(comp)} · Eleitores: ${fn(item.elet)}`;
       },{sticky:true,direction:'top'});
       layer.on('mouseover',e=>{if(k!==ST.territory)e.target.setStyle({weight:2,color:'#333'});});
@@ -1246,12 +1269,15 @@ function buildLegend(agg){
     if(!countByKey[lbl])countByKey[lbl]={cor:w.cor,count:0};
     countByKey[lbl].count++;
   }
-  el.innerHTML=Object.entries(countByKey).sort((a,b)=>b[1].count-a[1].count).slice(0,12).map(([lbl,info])=>`
-    <div class="li" onclick="toggleFilter('${ST.tab==='candidatos'?'cand':'partido'}','${lbl.replace(/'/g,"\\'")}','${info.cor.replace(/'/g,"\\'")}','${lbl.replace(/'/g,"\\'")}')">
-      <div class="li-sw" style="background:${info.cor}"></div>
-      <div class="li-nome">${lbl}</div>
-      <div class="li-r"><div class="li-abs">${info.count} loc.</div></div>
-    </div>`).join('');
+  el.innerHTML=Object.entries(countByKey)
+    .sort((a,b)=>b[1].count-a[1].count).slice(0,5)
+    .map(([lbl,info])=>`
+      <div class="li">
+        <div class="li-sw" style="background:${info.cor}"></div>
+        <div class="li-nome">${lbl.length>24?lbl.slice(0,24)+'…':lbl}</div>
+        <div class="li-r"><div class="li-abs">${info.count} mun.</div></div>
+      </div>`).join('')
+    +'<div style="font-size:10px;color:var(--g400);padding:6px 2px">Use a busca ou selecione uma grandeza.</div>';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1350,6 +1376,9 @@ function setMetric(id){
     if(inp)inp.value='';
   }
   buildGrandezaChips();
+  // Forçar re-render removendo camada atual
+  if(typeof MAP!=='undefined'&&GLAYER){try{MAP.removeLayer(GLAYER);}catch(e){}GLAYER=null;}
+  if(typeof MAP!=='undefined'&&PLAYER){try{MAP.removeLayer(PLAYER);}catch(e){}PLAYER=null;}
   renderMap();
 }
 
