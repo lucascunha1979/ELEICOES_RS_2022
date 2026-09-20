@@ -91,7 +91,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .tg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:5px}
 .titem{background:var(--g50);border:1px solid var(--g100);border-radius:var(--r);padding:7px 9px}
 .ti-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--g400);font-weight:600;margin-bottom:2px}
-.ti-val{font-family:var(--serif);font-size:18px;font-weight:700;line-height:1;color:var(--black)}
+.ti-val{font-family:var(--serif);font-size:15px;font-weight:700;line-height:1.05;color:var(--black);font-variant-numeric:tabular-nums}
 .ti-sub{font-size:11px;color:var(--g600);font-weight:600;margin-top:2px}
 .ccard{border:1px solid var(--g200);border-radius:var(--r);padding:8px 10px;margin-bottom:4px;display:grid;grid-template-columns:8px 1fr auto;gap:0 8px;align-items:center;position:relative;overflow:hidden;cursor:pointer;transition:background var(--e),border-color var(--e)}
 .ccard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--pc,var(--g200))}
@@ -139,7 +139,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .trow-bar-wrap{width:60px;height:4px;background:var(--g100);border-radius:2px;flex-shrink:0}
 .trow-bar{height:100%;border-radius:2px;background:var(--tc,var(--red))}
 .trow-pct{font-size:12px;font-weight:800;color:var(--black);width:42px;text-align:right;flex-shrink:0}
-.trow-abs{font-size:11px;color:var(--g700);font-weight:600;width:46px;text-align:right;flex-shrink:0}
+.trow-abs{font-size:11px;color:var(--g700);font-weight:600;width:58px;text-align:right;flex-shrink:0;font-variant-numeric:tabular-nums}
 .hint-box{margin:12px 0;padding:10px 12px;background:var(--g50);border:1px solid var(--g100);border-radius:var(--r);font-size:11px;color:var(--g600);line-height:1.6;text-align:center}
 #modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
 #modal-overlay.on{display:flex}
@@ -257,7 +257,7 @@ const PC={
   UP:'#DB2777',PSTU:'#BE123C',PATRIOTA:'#0D9488',PRD:'#0D9488',
 };
 const cor=p=>{if(!p)return'#6B7280';return PC[String(p).toUpperCase().trim()]||'#6B7280';};
-const fv=n=>n>=1e6?(n/1e6).toFixed(1).replace('.',',')+' M':n>=1e3?(n/1e3).toFixed(0)+' K':(n||0).toLocaleString('pt-BR');
+const fv=n=>(Math.round(+n)||0).toLocaleString('pt-BR'); // números inteiros reais (ex.: 4.985 · 8.589.432)
 const fn=n=>(n||0).toLocaleString('pt-BR');
 const fp=n=>n!=null?(n*100).toFixed(1).replace('.',',')+'%':'—';
 const h2r=(h,a)=>{if(!h||h.length<7)return`rgba(100,100,100,${a})`;const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;};
@@ -530,8 +530,12 @@ function getScalar(){
 // ═══════════════════════════════════════════════════════════
 function initMap(){
   MAP=L.map('map',{center:[-29.5,-53.0],zoom:7,zoomControl:true,attributionControl:false});
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:18,minZoom:5}).addTo(MAP);
-  L.control.attribution({prefix:'© OSM · CARTO · TSE'}).addTo(MAP);
+  // CARTO passou a exigir chave de API → usa o espelho alemão do OpenStreetMap (openstreetmap.de)
+  const baseTiles=L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png',{
+    maxZoom:18,minZoom:5,subdomains:'abc',attribution:'© OpenStreetMap contributors'
+  }).addTo(MAP);
+  baseTiles.on('tileerror',e=>{if(e.tile)e.tile.style.visibility='hidden';}); // esconde tile que falhar
+  L.control.attribution({prefix:'© OpenStreetMap · TSE'}).addTo(MAP);
 }
 function clearMapLayers(){
   if(GLAYER){MAP.removeLayer(GLAYER);GLAYER=null;}
