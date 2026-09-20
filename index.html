@@ -1496,6 +1496,14 @@ const MODALS={
     <p><span class="tag">Distrito</span> e <span class="tag">Bairro</span> são calculados pela soma das seções eleitorais em cada território. Municípios pequenos podem ter apenas um distrito.</p>
     <h3>Votos de legenda</h3>
     <p>Em <span class="tag">Partidos</span>, votos de legenda estão incluídos. Em <span class="tag">Candidatos</span>, apenas votos nominais.</p>
+    <h3>Diferenças entre totais de votos</h3>
+    <p>Os dados deste painel provêm de duas fontes do TSE com propósitos distintos:</p>
+    <ul>
+      <li><strong>Arquivo de seções eleitorais</strong> — registra os votos exatamente como digitados nas urnas no dia da eleição, antes de qualquer decisão judicial posterior.</li>
+      <li><strong>Resultado oficial por município</strong> — reflete a totalização final após o processo jurídico-eleitoral, que pode reclassificar votos de candidatos com registro sub judice ou cassados posteriormente.</li>
+    </ul>
+    <p>Por isso, pequenas diferenças entre os totais por seção e os totais oficiais são esperadas e não representam erro. Em <strong>Caxias do Sul</strong> (Dep. Estadual 2022), por exemplo, a diferença de 705 votos foi integralmente explicada por 173 votos anulados (candidata cassada) e 532 votos reclassificados como nulo técnico por decisão judicial.</p>
+    <p>Os votos de legenda (voto na sigla do partido, sem escolha de candidato) estão incluídos nos totais de comparecimento e nos resultados por partido, conforme a legislação eleitoral brasileira.</p>
     <h3>Clusters LISA</h3>
     <p>Moran's I Local com 499 permutações e α=0,05. Identifica agrupamentos espaciais estatisticamente significativos. Disponível nas escalas Município, COREDE e Região, com a adjacência recalculada para cada abrangência.</p>
     <h3>Cobertura espacial</h3>
